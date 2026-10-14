@@ -1,5 +1,7 @@
 # TaskSkillGuard Implementation Plan
 
+> 本文件保留初始计划。最终执行状态、有限替代和未完成项以 `requirements_matrix.md`、`final_report.md` 为准；下列原始清单不是完成声明。
+
 **Goal:** 完成可复现的论文启发实验，保留可审查证据。
 **Architecture:** 独立 corpus、graph、policy、sandbox、benchmark、models、evaluation 模块。
 **Tech Stack:** Python 3.12、SQLite只读、AST、Z3、JSON Schema、pytest、OpenAI Responses API。

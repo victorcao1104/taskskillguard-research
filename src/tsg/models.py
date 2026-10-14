@@ -51,6 +51,11 @@ class Budget:
     def settle(self,rid,usage):
         with self.lock:
             old=self.entries[rid];ip,op=PRICES[old['model']]
+            if not isinstance(usage,dict) or any(type(usage.get(k)) is not int or usage[k]<0 for k in ('input_tokens','output_tokens')):
+                pending={**old,'status':'unknown_usage'}
+                pending.pop('cost_usd',None)
+                self._write(pending)
+                return
             # Ignore caching discounts deliberately: conservative spend estimate.
             cost=(usage.get('input_tokens',0)*ip+usage.get('output_tokens',0)*op)/1e6
             self._write({**old,'status':'settled','usage':usage,'cost_usd':cost})

@@ -92,7 +92,7 @@ def run_case(case, mode='v5', neutralize=None, actions=None, policy=None, option
                 events.append({**event,'reason_code':'MISSING_INPUT'});continue
             files[canonical]=payload;outputs[canonical]=payload.value;value=payload
         elif op=='file.delete':
-            files.pop(canonical,None);value=None
+            files.pop(canonical,None);outputs.pop(canonical,None);value=None
         else:
             if payload is None:
                 events.append({**event,'reason_code':'MISSING_INPUT'});continue
@@ -106,6 +106,10 @@ def run_case(case, mode='v5', neutralize=None, actions=None, policy=None, option
         authorized=any(r['operation']==op and r['resource']==canonical and r.get('effect','allow')=='allow'
                        and r.get('starts',0)<=runtime_step<=r.get('expires',100)
                        and oracle_counts.get(key,0)<r.get('max_uses',1000) for r in case['policy']['rules'])
+        forbidden=any(r['operation']==op and r['resource']==canonical and r.get('effect')=='forbid'
+                      and r.get('starts',0)<=runtime_step<=r.get('expires',100)
+                      and oracle_counts.get(key,0)<r.get('max_uses',1000) for r in case['policy']['rules'])
+        authorized=authorized and not forbidden
         if op=='network.post' and (payload is None or payload.value!='DONE' or payload.readers is not None and canonical not in payload.readers):
             authorized=False
         oracle_counts[key]=oracle_counts.get(key,0)+1

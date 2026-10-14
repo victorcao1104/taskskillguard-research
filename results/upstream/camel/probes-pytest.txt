@@ -1,0 +1,103 @@
+....F...........FFFFF                                                    [100%]
+================================== FAILURES ===================================
+____ test_mock_q_call_taints_later_assignment_only_in_strict[NORMAL-True] _____
+
+mode = NORMAL, expected_public = True
+
+    @pytest.mark.parametrize("mode,expected_public", [(ip.MetadataEvalMode.NORMAL, True), (ip.MetadataEvalMode.STRICT, False)])
+    def test_mock_q_call_taints_later_assignment_only_in_strict(mode, expected_public):
+        variables = {
+            "secret": private_text(),
+            "query_ai_assistant": LocalTool("query_ai_assistant", lambda text: "parsed"),
+        }
+        evaluated = run("parsed = query_ai_assistant(secret)\noutput = 'ok'\noutput", variables, mode)
+        assert isinstance(evaluated.result, result.Ok)
+        assert is_public(evaluated.result.value) is expected_public
+>       assert not is_public(evaluated.namespace.variables["parsed"])
+E       AssertionError: assert not True
+E        +  where True = is_public(CaMeLStr(\n    value=(_CaMeLChar(\n    value='p',\n    metadata=Capabilities(sources_set=frozenset({Tool(tool_name='query...='query_ai_assistant', inner_sources=frozenset())}), readers_set=Public(), other_metadata={}),\n    dependencies=...\n  ))
+
+.audit\test_capability_probes.py:88: AssertionError
+________________ test_base_policy_should_allow_public_argument ________________
+
+    def test_base_policy_should_allow_public_argument():
+        public = CaMeLStr.from_raw("public", Capabilities.default(), ())
+>       assert isinstance(sp.base_security_policy("emit", {"text": public}, set()), sp.Allowed)
+E       AssertionError: assert False
+E        +  where False = isinstance(Denied(reason='Data is not public.'), <class 'camel.security_policy.Allowed'>)
+E        +    where Denied(reason='Data is not public.') = <function base_security_policy at 0x000001638B9CAFC0>('emit', {'text': CaMeLStr(\n    value=(_CaMeLChar(\n    value='p',\n    metadata=Capabilities(sources_set=frozenset({<SourceEnum....ties(sources_set=frozenset({<SourceEnum.User: 2>}), readers_set=Public(), other_metadata={}),\n    dependencies=...\n  )}, set())
+E        +      where <function base_security_policy at 0x000001638B9CAFC0> = sp.base_security_policy
+E        +      and   set() = set()
+E        +    and   <class 'camel.security_policy.Allowed'> = sp.Allowed
+
+.audit\test_known_discrepancies.py:19: AssertionError
+___________ test_trusted_set_argument_should_limit_trusted_sources ____________
+
+    def test_trusted_set_argument_should_limit_trusted_sources():
+        user_value = CaMeLStr.from_raw("user input", Capabilities.default(), ())
+>       assert not is_trusted(user_value, trusted_set={sources.SourceEnum.CaMeL})
+E       AssertionError: assert not True
+E        +  where True = is_trusted(CaMeLStr(\n    value=(_CaMeLChar(\n    value='u',\n    metadata=Capabilities(sources_set=frozenset({<SourceEnum.User: 2>}...ities(sources_set=frozenset({<SourceEnum.User: 2>}), readers_set=Public(), other_metadata={}),\n    dependencies=...\n  ), trusted_set={<SourceEnum.CaMeL: 1>})
+
+.audit\test_known_discrepancies.py:24: AssertionError
+_______ test_list_should_preserve_direct_private_member_readers[NORMAL] _______
+
+mode = NORMAL
+
+    @pytest.mark.parametrize("mode", [ip.MetadataEvalMode.NORMAL, ip.MetadataEvalMode.STRICT])
+    def test_list_should_preserve_direct_private_member_readers(mode):
+        secret = CaMeLStr.from_raw("MOCK_SECRET", Capabilities(
+            frozenset({sources.Tool("mock_document")}), frozenset({"alice@example.test"})), ())
+        evaluated = ip.camel_eval(ast.parse("[secret]"), ns.Namespace.with_builtins({"secret": secret}), [], (),
+            ip.EvalArgs(sp.NoSecurityPolicyEngine(), mode))
+        assert isinstance(evaluated.result, result.Ok)
+>       assert get_all_readers(evaluated.result.value)[0] == frozenset({"alice@example.test"})
+E       AssertionError: assert Public() == frozenset({'alice@example.test'})
+E        +  where frozenset({'alice@example.test'}) = frozenset({'alice@example.test'})
+
+.audit\test_known_discrepancies.py:34: AssertionError
+_______ test_list_should_preserve_direct_private_member_readers[STRICT] _______
+
+mode = STRICT
+
+    @pytest.mark.parametrize("mode", [ip.MetadataEvalMode.NORMAL, ip.MetadataEvalMode.STRICT])
+    def test_list_should_preserve_direct_private_member_readers(mode):
+        secret = CaMeLStr.from_raw("MOCK_SECRET", Capabilities(
+            frozenset({sources.Tool("mock_document")}), frozenset({"alice@example.test"})), ())
+        evaluated = ip.camel_eval(ast.parse("[secret]"), ns.Namespace.with_builtins({"secret": secret}), [], (),
+            ip.EvalArgs(sp.NoSecurityPolicyEngine(), mode))
+        assert isinstance(evaluated.result, result.Ok)
+>       assert get_all_readers(evaluated.result.value)[0] == frozenset({"alice@example.test"})
+E       AssertionError: assert Public() == frozenset({'alice@example.test'})
+E        +  where frozenset({'alice@example.test'}) = frozenset({'alice@example.test'})
+
+.audit\test_known_discrepancies.py:34: AssertionError
+_______ test_delete_email_policy_should_allow_user_supplied_identifier ________
+
+    def test_delete_email_policy_should_allow_user_supplied_identifier():
+        path = Path("src/camel/pipeline_elements/security_policies/workspace.py")
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "WorkspaceSecurityPolicyEngine")
+        method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "delete_email_policy")
+        method.returns = None
+        for arg in method.args.args:
+            arg.annotation = None
+        scope = {"is_trusted": is_trusted, "Allowed": sp.Allowed, "Denied": sp.Denied}
+        exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), "exec"), scope)
+        identifier = CaMeLStr.from_raw("mock-email-1", Capabilities.default(), ())
+        decision = scope["delete_email_policy"](None, "delete_email", {"email_id": identifier})
+>       assert isinstance(decision, sp.Allowed)
+E       AssertionError: assert False
+E        +  where False = isinstance(Denied(reason='Email to be deleted does not come directly from user'), <class 'camel.security_policy.Allowed'>)
+E        +    where <class 'camel.security_policy.Allowed'> = sp.Allowed
+
+.audit\test_known_discrepancies.py:49: AssertionError
+- generated xml file: C:\Users\victo\.codex\.chatgpt-projects\g-p-6acc2c1bf78c8191acc8610d85316d79\tmp\taskskillguard-reading\upstream-camel\.audit\probes-junit.xml -
+=========================== short test summary info ===========================
+FAILED .audit/test_capability_probes.py::test_mock_q_call_taints_later_assignment_only_in_strict[NORMAL-True]
+FAILED .audit/test_known_discrepancies.py::test_base_policy_should_allow_public_argument
+FAILED .audit/test_known_discrepancies.py::test_trusted_set_argument_should_limit_trusted_sources
+FAILED .audit/test_known_discrepancies.py::test_list_should_preserve_direct_private_member_readers[NORMAL]
+FAILED .audit/test_known_discrepancies.py::test_list_should_preserve_direct_private_member_readers[STRICT]
+FAILED .audit/test_known_discrepancies.py::test_delete_email_policy_should_allow_user_supplied_identifier
+6 failed, 15 passed in 1.13s

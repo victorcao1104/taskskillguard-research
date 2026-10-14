@@ -1,4 +1,6 @@
-# TaskSkillGuard 实验设计（预注册）
+# TaskSkillGuard 实验前设计草案
+
+本文件是本地事先设计记录，未在公开平台注册；实际变更与未完成项见 `design_amendments.md` 和 `requirements_matrix.md`。
 
 日期：2026-10-15。依据用户提供的 TaskSkillGuard 手册；用户授权自主设计、实施、创建私有 GitHub 仓库。模型限定 gpt-6-luna 与 gpt-4.1-mini，总 API 预算不超过 USD 20。原始 corpus 和数据库只读。
 
