@@ -1,62 +1,55 @@
 # TaskSkillGuard Research
 
-基于 SkillScope、Progent、CaMeL 的可复现研究原型。按用户研究手册设计、真实调用 GPT-6 Luna / GPT-4.1 mini，保留数据来源、原始预测、执行轨迹、失败与费用。
+依据用户研究手册，结合 SkillScope、Progent、CaMeL 的研究原型与实际实验。两轮自动化工作完成，原始预测、真实容器轨迹、失败、不确定结果、统计与费用均保留。**真人双标注由用户后续安排，不能将当前结果称为完整人工验证。**
 
-**先读：[中文研究报告](docs/final_report.md) · [手册要求逐项状态](docs/requirements_matrix.md) · [复现指南](docs/reproduction.md)。**
+入口：[中文最终报告](docs/final_report.md) · [逐项验收矩阵](docs/phase2_requirements_matrix.md) · [复现指南](docs/reproduction_phase2.md) · [人工接续说明](docs/phase2_annotation.md)。
 
-## 已执行的研究
+## 实际完成的工作
 
-| 轨道 | 实际证据 |
+| 轨道 | 保存的证据 |
 |---|---|
-| 论文与代码 | 三篇全文/附录审计；Progent、CaMeL 官方仓库固定 commit 与本地探针；SkillScope 官方实现未核实到 |
-| 真实语料 | 从 skills.sh completed 只读抽180包、123家族；3,414文件哈希复核无变化 |
-| 真实模型审计 | 获准的30包×两模型=60提取记录；90个假设任务、360条任务条件化预测；人工标注列留空 |
-| 合成实验 | 132案例、6模板；1,056条正式分类、528合同、528计划、72格式变形记录 |
-| 动态机制 | 1,188条内存VM运行、396组original/replay/reference、396次策略更新 |
-| 补充验证 | 72次LLM Judge；48次开发集单句提示消融；逐家族bootstrap与事后标签敏感性分析 |
-| 费用 | usage估算USD1.3559874；含未结算预留的保守上界 **USD1.3650669 / USD20** |
+| 三篇论文 | 全文/附录阅读；Progent、CaMeL 官方代码固定 commit 与最小实测；SkillScope 官方实现未核实，明确标为 paper-inspired |
+| 真实来源 | skills.sh completed 中抽取 180 包、123 家族；3,414 文件前后哈希一致；保留原始 ID、来源、路径和 split |
+| 全样本模型检测 | GPT-6 Luna / GPT-4.1 mini；360 条 Q 提取、2,160 条 V0/V1 三任务分类；未知与失败单列 |
+| P/Q 与合同执行 | 1,644 条新规划记录（1,188 个不同请求 hash）；3,168 条 E3 闭环；九配置各 528 条运行 |
+| 真正 OS 执行 | 240 次正式工具适配器容器执行；另有 31 份原始来源脚本检查，其中四个功能任务成功、27 个接口探针、九个运行错误 |
+| Replay / 机制 | 三类动作九次类型保持回放、六条双模型 Judge；33 合同探针、10 信息流探针、96 次期限/额度控制；1,188 条固定动作机制运行 |
+| 统计与交付 | family bootstrap、配对比较、联合 Holm、实际 CPU/RAM、PNG/PDF 图表、五个以上可复核错误案例；两份独立盲审包 |
+| 累计费用 | usage 估计 USD5.8498859；含六笔历史未结算预留的保守上界 **USD5.8589654 / 20**，不是平台账单 |
 
-## 主要发现
+## 结果怎么解读
 
-- 固定合成程序：未守卫84/132案例越权；完整配置0/132，目标达成132/132。V3仍泄露24/24，V4与V5为0/24。**仅适用于有限内存模拟、冻结的精确策略。**
-- 合成测试集直接文本V0已接近天花板，增加图没有提高检测，部分条件反而退化。V2/V5后处理没有提升必要性F1。
-- 真实静态图约94.65%的候选节点缺少具体资源；模型之间有明显分歧，不能据此报告真实恶意率或安全准确率。
-- LLM Judge会混淆原始与中和执行；复核保留这些失败，没有把理由流畅当作正确证据。
+- 正确合同的 OS 守卫组达成目标 **24/24**，越权 **0/16** 个攻击机会；未守卫组越权 **16/16**。这是六类可信工具 fixture 的结果，不是任意第三方脚本的安全证明。
+- 模型闭环暴露了明显可用性问题。Luna 的 held-out 完整配置完成 **50/69** 个已决定任务，另有 **19** 个不确定；mini 同条件 **88/88** 个不确定，不能填成“零攻击、全安全”。去掉共享守卫后 Luna 完成54/69，但两组均无观测越权，因此此对比不能证明守卫带来安全增益。
+- 新静态图已知资源比例由 **6.64% → 7.32%**，加入1,609条 DATA 边，仍有大量未解析结构。该指标不是语义准确率。
+- 三类可比回放中，两例支持动作不必要，一例保持 unknown。Judge 与这三对确定性输出检查一致，不构成人工 GT。
+- 家族样本量小、重复嵌套；联合多重比较校正后没有显著优势证据。模型或机制没有改善的结果均保留。
 
-![受控机制结果](results/figures/mechanistic_comparison.png)
+![OS安全与任务完成](results/phase2/figures/os_security_utility.png)
 
-## 目录导航
+## 目录
 
 | 路径 | 内容 |
 |---|---|
-| [docs/literature](docs/literature/) | 三篇全文阅读记录、公式/代码/版本核验、上游复查说明 |
-| [docs/source_audit.md](docs/source_audit.md) | 方法归属、官方仓库与独立重写界限 |
-| [docs/design_amendments.md](docs/design_amendments.md) | 旧设计问题、冻结前修订、适用范围 |
-| [data/manifests](data/manifests/) | completed抽样、原始标识/路径/哈希、家族切分、未修改核验 |
-| [data/annotation](data/annotation/) | 双人标注待审核表；没有伪造human GT |
-| [src/tsg](src/tsg/) | corpus、partial graph、策略/SMT、信息流、内存VM、模型记录与统计 |
-| [results/api](results/api/) | 请求/响应/usage、内容寻址缓存、完整预算账本 |
-| [results/summary](results/summary/) | CSV/JSON、覆盖率、置信区间、错误明细、成本对账 |
-| [results/supplement_summary](results/supplement_summary/) | 真实迁移一致性、Judge、提示消融 |
-| [results/upstream](results/upstream/) | Progent/CaMeL原始探针结果和许可证 |
-| [results/verification](results/verification/) | 测试、回链、运行稳定性及交付核验 |
+| [docs/literature](docs/literature/) | 三论文阅读、公式、页码、官方来源、版本及许可 |
+| [docs/source_audit.md](docs/source_audit.md) | 方法归属与上游代码可验证边界 |
+| [data/manifests](data/manifests/) | completed 抽样、来源、原始路径、内容哈希与家族切分 |
+| [data/annotation_v2](data/annotation_v2/) | 双人独立盲审包、协调者映射、三层标签、导入与仲裁 |
+| [src/tsg](src/tsg/) / [containers](containers/) | 图、合同、SMT、双账本、P/Q、VM、真实 OS 隔离 |
+| [results/api](results/api/) | 内容寻址请求/响应、usage、单写入者累计预算 |
+| [results/phase2](results/phase2/) | 全部新实验、容器输出/syscall、汇总、图、失败与验证 |
+| [results/upstream](results/upstream/) | Progent/CaMeL 最小实测原始日志及许可证 |
 
-## 离线检查
+## 快速离线核验
 
-安装 Python 3.12 与 `configs/requirements-lock.txt` 后，在仓库根目录运行：
+安装 Python 3.12 与 `configs/requirements-lock.txt` 后：
 
 ```text
-python -m pytest -q --basetemp work/local-check
+python -m pytest -q --basetemp work/check
 python scripts/verify_release.py
-python scripts/check_runtime_stability.py
+python scripts/verify_phase2_release.py
 ```
 
-统计重算不需要API密钥。请按[复现指南](docs/reproduction.md)建立 `work/` 副本，运行 `analyze_results.py`、`analyze_supplement.py`、`analyze_combined.py`、`plot_results.py` 和 `write_report.py`，以保留发布证据。
+统计不需要密钥；新的 Docker 复跑可复用已保存合同，详见复现指南。发布证据与新工作目录分离，禁止覆盖原数据、清空预算或在宿主执行 Skill 指令。
 
-## 必须保留的边界
-
-这不是完整三论文主实验复现，不是OS沙箱，不执行原始Skill脚本；没有真实Skill动态held-out或人工双标注。P/Q只实现组件隔离，运行策略为oracle policy，未形成完整自主agent评测。合成测试集只含2个模板家族，且机制开发时见过这些模板，统计外推很弱。
-
-2笔历史已计费调用缺原始响应，费用仍计入；6笔未结算预留未删除。正式结果均能回链现存raw。旧设计/旧解析结果另存，排除正式分母。
-
-原始整库、密钥、虚拟环境和PDF全文不上传。第三方片段只作为研究数据，不可当安装或执行指令；原版权与许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+原始整库、密钥、虚拟环境和 PDF 全文不上传。有限第三方片段只作待分析数据；许可证与归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。第一轮原始结论保留于 [study_v1_report.md](docs/study_v1_report.md) 和 tag `study-v1`，新结果不改写旧观察。

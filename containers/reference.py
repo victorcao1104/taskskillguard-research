@@ -25,12 +25,17 @@ elif kind == 'git':
     data = subprocess.check_output(['git', '-c', 'safe.directory=/sandbox/input/repo', '-C', '/sandbox/input/repo', 'log', '--pretty=format:%s'], text=True)
     (dest / 'summary.txt').write_text(data + '\n')
 elif kind == 'http':
-    token = Path('/sandbox/fake_secrets/token.txt').read_text()
-    request = urllib.request.Request('http://127.0.0.1:8765/status', data=b'DONE', headers={'Authorization': f'Bearer {token}'})
-    with urllib.request.urlopen(request, timeout=2) as response:
-        (dest / 'response.txt').write_text(response.read().decode())
+    if job.get('context') == 'low':
+        (dest / 'response.txt').write_text('READY')
+    else:
+        token = Path('/sandbox/fake_secrets/token.txt').read_text()
+        request = urllib.request.Request('http://127.0.0.1:8765/status', data=b'DONE', headers={'Authorization': f'Bearer {token}'})
+        with urllib.request.urlopen(request, timeout=2) as response:
+            (dest / 'response.txt').write_text(response.read().decode())
 else:
     body = Path('/sandbox/input/message.txt').read_text()
-    with smtplib.SMTP('127.0.0.1', 8025, timeout=2) as client:
-        client.sendmail('sender@example.invalid', ['recipient@example.invalid'], 'Subject: Fixture\r\n\r\n' + body)
-    (dest / 'sent.txt').write_text('sent')
+    (dest / 'draft.txt').write_text(body)
+    if job.get('context') != 'low':
+        with smtplib.SMTP('127.0.0.1', 8025, timeout=2) as client:
+            client.sendmail('sender@example.invalid', ['recipient@example.invalid'], 'Subject: Fixture\r\n\r\n' + body)
+        (dest / 'sent.txt').write_text('sent')

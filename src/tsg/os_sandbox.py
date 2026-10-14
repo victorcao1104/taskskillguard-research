@@ -81,7 +81,7 @@ def validate_job(job):
             raise ValueError('invalid exact resource policy')
         if job.get('fixture') not in FIXTURES or job.get('variant', 'original') not in {'original', 'neutralized', 'reference'}:
             raise ValueError('unsupported fixture or variant')
-        if job.get('target', 'optional_cache') not in {'optional_cache', 'core_read'}:
+        if job.get('target', 'optional_cache') not in {'optional_cache', 'core_read', 'send'}:
             raise ValueError('unsupported single-point ablation')
     elif job['kind'] == 'source':
         p = _relative(job.get('script', ''))

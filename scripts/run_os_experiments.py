@@ -8,6 +8,7 @@ import json
 from pathlib import Path, PureWindowsPath
 import subprocess
 import sys
+import statistics
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from tsg.os_sandbox import ContainerSandbox, FIXTURES, replay_verdict, stage_bundle
@@ -78,6 +79,106 @@ FUNCTIONAL = {
 }
 
 
+def summarize_replay_results():
+    """Aggregate the frozen typed track; preserve invalid exploratory records."""
+    directory = OUT / 'typed_replay'
+    if not (directory / 'comparisons.json').exists():
+        return
+    pairs = json.loads((directory / 'comparisons.json').read_text(encoding='utf-8'))
+    runs = json.loads((directory / 'runs.json').read_text(encoding='utf-8'))
+    valid = [row for row in pairs if row['replay_valid'] is True]
+    write_json(OUT / 'replay_summary_final.json', {
+        'timestamp_utc': datetime.now(timezone.utc).isoformat(),
+        'authoritative': True,
+        'typed_run_count': len(runs),
+        'typed_process_success_count': sum(row['status'] == 'executed' for row in runs),
+        'valid_replay_pairs': len(valid),
+        'valid_action_classes': sorted({row['operation'] for row in valid}),
+        'goal_preserving_pairs': sum(row['neutralized_goal'] is True for row in valid),
+        'goal_losing_pairs': sum(row['neutralized_goal'] is False for row in valid),
+        'unnecessary_evidence_pairs': sum(row['task_necessary'] is False for row in valid),
+        'necessity_unknown_pairs': sum(row['task_necessary'] is None for row in valid),
+        'pairs': pairs,
+        'trace_paths': [f"typed_replay/{row['case_id']}/syscalls.log" for row in runs],
+        'excluded_legacy': [
+            {'path': 'replay_multiaction/http-*', 'status': 'protocol_invalid',
+             'reason': 'Frozen trusted task specified literal READY; old embedded oracle also accepted actual output OK. Original did not satisfy the literal task. Excluded from valid replay and necessity denominators.',
+             'raw_records_preserved': True},
+            {'path': 'replay_multiaction/smtp-*', 'status': 'superseded_exploratory',
+             'reason': 'Replaced by explicitly type-preserving acknowledgement in typed_replay/smtp-send-*; no double counting.',
+             'raw_records_preserved': True},
+        ],
+        'all_runs_scope': 'Initial18fixture+32source+6exploratory+9typed=65 actual containers, excluding integration tests and separately reported OS E3.',
+    })
+    read_check = []
+    for variant in ['original', 'neutralized']:
+        case_id = 'csv-read-' + variant
+        trace = (directory / case_id / 'syscalls.log').read_text(encoding='utf-8')
+        read_check.append({'case': case_id, 'actual_input_open_syscalls': [
+            line for line in trace.splitlines()
+            if 'openat(' in line and '"/sandbox/input/numbers.csv"' in line
+        ]})
+    write_json(directory / 'read_syscall_check.json', read_check)
+
+
+def summarize_results():
+    summarize_replay_results()
+    fixtures = json.loads((OUT / 'fixture_runs.json').read_text(encoding='utf-8'))
+    initial = json.loads((OUT / 'source_runs.json').read_text(encoding='utf-8'))
+    supplements = json.loads((OUT / 'supplemental_source_runs.json').read_text(encoding='utf-8')) if (OUT / 'supplemental_source_runs.json').exists() else []
+    latest = {r['skill_id']: r for r in initial + supplements}
+    source_manifest = [json.loads(x) for x in (ROOT / 'data/manifests/skills_manifest.jsonl').read_text(encoding='utf-8').splitlines()]
+    records = []
+    grouped = [('fixture', fixtures), ('source_initial', initial), ('source_supplemental', supplements)]
+    for group in ['replay_multiaction', 'typed_replay']:
+        path = OUT / group / 'runs.json'
+        if path.exists():
+            grouped.append((group, json.loads(path.read_text(encoding='utf-8'))))
+    for group, rows in grouped:
+        for row in rows:
+            resource = row.get('resources', {})
+            audit = row.get('audit') or {}
+            records.append({'group': group, 'case_id': row.get('case_id', row.get('skill_id')), 'status': row['status'], 'goal_satisfied': row['goal_satisfied'], 'image_id': row.get('image_id'), 'cpu_seconds_tracer_and_payload': resource.get('child_cpu_seconds'), 'memory_peak_bytes_whole_container': resource.get('cgroup_memory_peak_bytes'), 'payload_wall_seconds': resource.get('payload_wall_seconds'), 'container_wall_seconds': row.get('wall_seconds_including_container'), 'process_events': audit.get('process_events'), 'file_events': audit.get('file_events'), 'network_events': audit.get('network_events')})
+    with (OUT / 'resource_metrics.csv').open('w', newline='', encoding='utf-8') as handle:
+        writer = csv.DictWriter(handle, fieldnames=records[0].keys()); writer.writeheader(); writer.writerows(records)
+    summary = {'runs': len(records), 'scope': 'Measured child CPU includes strace/payload; cgroup RAM includes supervisor, fixture setup, and payload. Early image payload-wall also included oracle time. Independent containers, not independent skill families.', 'groups': {}}
+    for group, _ in grouped:
+        group_rows = [r for r in records if r['group'] == group]
+        summary['groups'][group] = {'runs': len(group_rows)}
+        for key in ['cpu_seconds_tracer_and_payload', 'memory_peak_bytes_whole_container', 'container_wall_seconds', 'process_events', 'file_events', 'network_events']:
+            values = [r[key] for r in group_rows if r[key] is not None]
+            summary['groups'][group][key] = {'observed': len(values), 'mean': statistics.mean(values) if values else None, 'max': max(values) if values else None, 'min': min(values) if values else None}
+    write_json(OUT / 'resource_summary.json', summary)
+    unchanged = []
+    for row in source_manifest:
+        if row['skill_id'] not in latest:
+            continue
+        changes, count = [], 0
+        for filename, expected in row['file_sha256'].items():
+            path = Path(row['bundle_path']).joinpath(*PureWindowsPath(filename).parts)
+            count += 1
+            if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                changes.append(filename)
+        unchanged.append({'skill_id': row['skill_id'], 'files_checked': count, 'changed_files': changes})
+    write_json(OUT / 'source_immutability.json', {'bundles_checked': len(unchanged), 'files_checked': sum(r['files_checked'] for r in unchanged), 'changed_files': sum(len(r['changed_files']) for r in unchanged), 'rows': unchanged})
+    compatibility = []
+    for row in source_manifest:
+        observed = latest.get(row['skill_id'])
+        reason = 'functional_fixture' if observed and observed.get('execution_mode') == 'functional_fixture' else 'interface_smoke_only_no_task_oracle' if observed else 'instruction_only_no_executable' if not row['has_scripts'] else 'outside_bounded_source_execution_subset'
+        if observed and observed['status'] == 'runtime_error':
+            errorpath = OUT / 'sources' / row['skill_id'] / 'stderr.txt'
+            lines = errorpath.read_text(encoding='utf-8', errors='replace').splitlines() if errorpath.exists() else []
+            reason = lines[-1][:240] if lines else 'nonzero exit; see preserved stdout and syscall trace'
+        compatibility.append({'skill_id': row['skill_id'], 'source_native_id': row['source_native_id'], 'split': row['split'], 'status': observed['status'] if observed else 'unsupported_execution', 'reason': reason, 'execution_mode': observed.get('execution_mode', '') if observed else '', 'goal_satisfied': observed.get('goal_satisfied') if observed else None, 'human_ground_truth': False})
+    original_csv = OUT / 'compatibility_report.csv'
+    if not (OUT / 'compatibility_initial.csv').exists():
+        (OUT / 'compatibility_initial.csv').write_bytes(original_csv.read_bytes())
+    for filename, rows in [('compatibility_report.csv', compatibility), ('unsupported_reasons.csv', [r for r in compatibility if r['status'] != 'executed'])]:
+        with (OUT / filename).open('w', newline='', encoding='utf-8') as handle:
+            writer = csv.DictWriter(handle, fieldnames=compatibility[0].keys()); writer.writeheader(); writer.writerows(rows)
+    write_json(OUT / 'source_summary_final.json', {'distinct_sources_executed': len(latest), 'source_runs_including_development_retry': len(initial) + len(supplements), 'status_by_distinct_source_latest': dict(Counter(r['status'] for r in latest.values())), 'functional_task_sources': sum(r.get('execution_mode') == 'functional_fixture' for r in latest.values()), 'functional_task_successes': sum(r.get('goal_satisfied') is True for r in latest.values()), 'heldout_first_run_task_successes': sum(r.get('protocol') == 'frozen_first_run' and r.get('goal_satisfied') is True for r in supplements), 'interface_smoke_sources': sum(r.get('execution_mode') == 'cli_help_compatibility_only' for r in latest.values()), 'initial_development_chart_oracle_failure_retained': True, 'manifest_total': len(source_manifest), 'human_ground_truth': False, 'scope': 'Four bounded functional source tasks, 27 interface probes; no arbitrary-source tool enforcement or broad held-out generalization claim.'})
+
+
 def source_runs(sandbox, limit):
     manifest = [json.loads(x) for x in (ROOT / 'data/manifests/skills_manifest.jsonl').read_text(encoding='utf-8').splitlines()]
     candidates = [r for r in manifest if r['split'] == 'development' and any(p.endswith('.py') and not any(t in p.replace('\\', '/').split('/') for t in ['tests', '__init__.py']) for p in r['script_paths'])]
@@ -128,16 +229,68 @@ def main():
     parser.add_argument('--manifest-only', action='store_true')
     parser.add_argument('--freeze-supplement', action='store_true')
     parser.add_argument('--run-supplement', action='store_true')
+    parser.add_argument('--summarize', action='store_true')
+    parser.add_argument('--replay-multiaction', action='store_true')
+    parser.add_argument('--typed-replay', action='store_true')
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     write_json(OUT / 'fixtures_manifest.json', fixtures_manifest())
     if args.manifest_only:
+        return
+    if args.summarize:
+        summarize_results()
         return
     sandbox = ContainerSandbox()
     diagnostic = sandbox.diagnose()
     write_json(OUT / 'runtime_diagnostics.json', {'timestamp': datetime.now(timezone.utc).isoformat(), **diagnostic})
     if not diagnostic['available']:
         raise SystemExit('Docker unavailable; no experiment executed')
+    if args.typed_replay:
+        directory = OUT / 'typed_replay'
+        path = directory / 'frozen_manifest.json'
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == (directory / 'frozen_manifest.sha256').read_text().strip()
+        frozen = json.loads(path.read_text(encoding='utf-8'))
+        sandbox = ContainerSandbox(image=frozen['image_id'])
+        rows, comparisons = [], []
+        for case in frozen['cases']:
+            runs = {}
+            for variant in ['original', 'neutralized', 'reference']:
+                job = {**case['job'], 'variant': variant}
+                case_id = case['case_id'] + '-' + variant
+                target = directory / case_id
+                if (target / 'host_result.json').exists():
+                    raise SystemExit('Typed replay already executed; refusing overwrite')
+                result = sandbox.run(job, target)
+                result['case_id'] = case_id
+                rows.append(result); runs[variant] = result
+                write_json(directory / 'runs.json', rows)
+                print(case_id, result['status'], result['goal_satisfied'], flush=True)
+            comparisons.append({'case_id': case['case_id'], 'operation': case['operation'], 'neutralization': case['neutralization'], 'replay_valid': all(runs[v]['status'] == 'executed' for v in ['original', 'neutralized']) and runs['original']['goal_satisfied'] is True and runs['original']['target_triggered'] is True, 'original_goal': runs['original']['goal_satisfied'], 'neutralized_goal': runs['neutralized']['goal_satisfied'], 'reference_goal': runs['reference']['goal_satisfied'], 'reference_excludes_target': runs['reference']['reference_excludes_target'], 'original_sink_events': len(runs['original']['sink_events']), 'neutralized_sink_events': len(runs['neutralized']['sink_events']), **replay_verdict(runs['original'], runs['neutralized'], runs['reference'])})
+        write_json(directory / 'comparisons.json', comparisons)
+        return
+    if args.replay_multiaction:
+        directory = OUT / 'replay_multiaction'
+        path = directory / 'frozen_manifest.json'
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == (directory / 'frozen_manifest.sha256').read_text().strip()
+        frozen = json.loads(path.read_text(encoding='utf-8'))
+        sandbox = ContainerSandbox(image=frozen['image_id'])
+        rows = []
+        for job in frozen['jobs']:
+            case_id = job['fixture'] + '-' + job['variant']
+            target = directory / case_id
+            if (target / 'host_result.json').exists():
+                raise SystemExit('Replay already executed; refusing overwrite')
+            result = sandbox.run(job, target)
+            result['case_id'] = case_id
+            rows.append(result)
+            write_json(directory / 'runs.json', rows)
+            print(case_id, result['status'], result['goal_satisfied'], len(result['sink_events']), flush=True)
+        comparisons = []
+        for fixture, operation in frozen['targets'].items():
+            one = {r['job']['variant']: r for r in rows if r['job']['fixture'] == fixture}
+            comparisons.append({'fixture': fixture, 'operation': operation, **replay_verdict(one['original'], one['neutralized'], one['reference']), 'original_target_triggered': one['original']['target_triggered'], 'original_sink_events': len(one['original']['sink_events']), 'neutralized_sink_events': len(one['neutralized']['sink_events']), 'reference_sink_events': len(one['reference']['sink_events']), 'reference_excludes_target': one['reference']['reference_excludes_target'], 'all_goals_satisfied': all(r['goal_satisfied'] is True for r in one.values())})
+        write_json(directory / 'comparisons.json', comparisons)
+        return
     if args.freeze_supplement:
         manifest = [json.loads(x) for x in (ROOT / 'data/manifests/skills_manifest.jsonl').read_text(encoding='utf-8').splitlines()]
         source = next(r for r in manifest if r['skill_id'] == 'real-4d0159bbc4e714bf')

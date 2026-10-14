@@ -1,6 +1,6 @@
 # Execution ledger — TaskSkillGuard
 
-Final status (2026-10-15): bounded experiment tracks and report complete; human GT / arbitrary real-skill dynamic evaluation remain unperformed. Current authoritative records are `final_report.md`, `requirements_matrix.md`, and `experiment_log.md`. The following bullets preserve the initial investigation chronology rather than current pending work.
+Current status (2026-10-15): all planned phase-2 automated tracks are saved and analyzed, including 240 formal Docker runs and 31 original source entrypoints. Human labels remain pending by the user's explicit choice. Current authoritative records are `final_report.md`, `phase2_requirements_matrix.md`, and `phase2_experiment_log.md`. The following bullets preserve the first-round chronology, not the current outstanding work.
 
 - 2026-10-15: Read user manual in chunks. Full PDF texts extracted and fingerprinted; three independent paper/code audits in progress.
 - Dataset paths in request are stale. Found existing worktree at `skill-intelligence-platform/.worktrees/gitskills-baseline`. Verified read-only SQLite counts: A completed=9,547; B completed=94,565. Choose A as authorized.

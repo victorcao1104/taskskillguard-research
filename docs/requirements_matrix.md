@@ -1,5 +1,7 @@
 # 手册要求与实际证据矩阵
 
+**第一轮历史矩阵。当前自动化验收请看 [第二轮矩阵](phase2_requirements_matrix.md)；此处的旧缺口不代表第二轮仍未执行。**
+
 对照来源：用户的 `TaskSkillGuard_Research_Experiment_Manual_ZH.md`，§15 的 E0–E9、§18 的 WP-01–10，连同 §12–13、§16–17 的数据、隔离和统计要求。此表记录完成程度，不把实现了一个组件等同于完成整项实验。
 
 核心实现冻结提交：`195620a2d11fbb4b833254d8a5f5b19102b417e3`。补充评估、统计和交付文档可晚于核心冻结；各次运行以 `results/run_manifests/` 中的代码/配置哈希和提交为准。最终核验：2026-10-15（新西兰）。held_out、transfer、judge及提示消融均已结束；本表以下按最终落盘记录更新。冻结后边界修补的零差异回归见 results/verification/runtime_stability.json。

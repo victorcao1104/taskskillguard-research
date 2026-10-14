@@ -2,11 +2,18 @@
 import argparse
 import concurrent.futures
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
+FROZEN_INPUT_MANIFESTS = {
+    'phase2_pipeline_api': 'phase2_pipeline_api-2026-10-14T23-08-21.741110+00-00.json',
+    'development': 'development-2026-10-14T22-16-26.307819+00-00.json',
+    'validation': 'validation-2026-10-14T22-16-33.520818+00-00.json',
+    'held_out': 'held_out-2026-10-14T22-16-35.693046+00-00.json',
+}
 sys.path.insert(0,str(ROOT/'src'))
 from tsg.models import Client,Budget,load_key
 from tsg.policy import Policy,Rule
@@ -18,6 +25,38 @@ from run_experiment import dump_jsonl,run_manifest,graph_input
 
 def load(path):
     return [json.loads(s) for s in path.read_text(encoding='utf-8').splitlines()]
+
+
+def validate_frozen_inputs(root=ROOT):
+    """Fail closed against the explicitly identified final input manifests."""
+    root = Path(root)
+    dataset = 'data/benchmark/synthetic_cases.jsonl'
+    digest = hashlib.sha256((root / dataset).read_bytes()).hexdigest()
+    audit = {'synthetic_cases_sha256': digest, 'manifests': {}}
+    for phase, filename in FROZEN_INPUT_MANIFESTS.items():
+        path = root / 'results/run_manifests' / filename
+        try:
+            raw = path.read_bytes()
+            manifest = json.loads(raw)
+            hashes = [v for k, v in manifest['files_sha256'].items()
+                      if k.replace('\\', '/') == dataset]
+            if manifest.get('phase') != phase or len(hashes) != 1:
+                raise ValueError('FROZEN_INPUT_AMBIGUOUS: ' + phase)
+            if hashes[0] != digest:
+                raise ValueError('FROZEN_INPUT_MISMATCH: ' + phase)
+        except (OSError, KeyError, TypeError, AttributeError, json.JSONDecodeError) as exc:
+            raise ValueError('FROZEN_INPUT_UNVERIFIABLE: ' + phase) from exc
+        audit['manifests'][phase] = {'path': str(path.relative_to(root)),
+                                     'sha256': hashlib.sha256(raw).hexdigest(),
+                                     'synthetic_cases_sha256': hashes[0]}
+    return audit
+
+
+def apply_q_plan_status(record, q_plan):
+    record['q_plan_status'] = 'valid' if isinstance(q_plan, list) else 'unresolved'
+    if record['q_plan_status'] != 'valid' and record.get('status') == 'valid':
+        record['original_pipeline_status'] = record['status']
+        record['status'] = 'unresolved_q_plan'
 
 
 def infer(client,case,model,variant,form,replicate):
@@ -64,8 +103,11 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--api',action='store_true');p.add_argument('--env-file',type=Path)
     p.add_argument('--workers',type=int,default=8);p.add_argument('--limit',type=int)
     a=p.parse_args();cases=load(ROOT/'data/benchmark/synthetic_cases.jsonl')
+    input_validation = None if a.api else validate_frozen_inputs(ROOT)
     if a.limit:cases=cases[:a.limit]
     out=ROOT/'results/phase2/pipeline';out.mkdir(parents=True,exist_ok=True)
+    if input_validation is not None:
+        (out/'frozen_input_validation.json').write_text(json.dumps(input_validation,indent=2),encoding='utf-8')
     run_manifest('phase2_pipeline_api' if a.api else 'phase2_pipeline_runtime')
     if a.api:
         client=Client(load_key(a.env_file),ROOT/'results/api/raw',Budget(ROOT/'results/api/budget.jsonl',20))
@@ -95,7 +137,8 @@ def main():
         for r in load(ROOT/f'results/{phase}/detection.jsonl'):
             classifications[(r['case_id'],r['model'],r['variant'],r['replicate'])]=r.get('prediction')
         for r in load(ROOT/f'results/{phase}/plans.jsonl'):
-            if not r['textual_guard']:q_plans[(r['case_id'],r['model'])]=r.get('action_ids')
+            if not r['textual_guard']:
+                q_plans[(r['case_id'],r['model'])] = r.get('action_ids') if r.get('status') == 'valid' else None
         for r in load(ROOT/f'results/{phase}/contracts.jsonl'):
             old_contracts[(r['case_id'],r['model'],r['separated'])]=r
     # Required E3 special condition: original LLM scope contracts are really
@@ -130,10 +173,10 @@ def main():
                         variant=variant,q_plan=q_plans.get((case['case_id'],model)) or [],reference_actions=clean.get('reference_actions',[]))
                     result.update(model=model,replicate=replicate,p_request_hash=(clean if FEATURES[variant]['trust'] else mixed).get('request_hash'),
                                   q_plan_source='frozen_v1_tool_free_model_recommendation',
-                                  q_plan_status='valid' if q_plans.get((case['case_id'],model)) is not None else 'unresolved',
                                   p_declared_unknowns=(clean if FEATURES[variant]['trust'] else mixed).get('prediction',{}).get('unknowns',[]),
                                   runtime_kind='capability_vm',attack_opportunity=case['malicious'],
                                   p_reference_result=run_case(case,'none',actions=clean.get('reference_actions',[])))
+                    apply_q_plan_status(result,q_plans.get((case['case_id'],model)))
                     result['p_reference_valid']=(result['p_reference_result']['goal_satisfied'] and not result['p_reference_result']['unauthorized_executed'])
                     results.append(result)
         dump_jsonl(out/('ablation_'+variant+'.jsonl'),results)

@@ -1,5 +1,7 @@
 # TaskSkillGuard 冻结前独立代码复核
 
+此页保留第一轮审阅。第二轮结果与修复见 [phase2_code_review.md](phase2_code_review.md)。
+
 **最终状态更新：本报告下方“最终定向复核补充”已独立确认三个 P2 全部修复；全套 49 项测试通过，3,300 次保存执行离线复跑零差异。下列“仍待处理”是前一快照的历史状态，不代表最终实现仍有这些问题。**
 
 审查时间：2026-10-15（Pacific/Auckland）；最后缓存只读快照为 2026-10-14T22:17:11Z。审查对象尚无冻结 commit，以下使用文件 SHA-256 定位。按 requesting-code-review 的独立审查要求执行；未修改实现、数据、真实 API 缓存或账本，未调用 API，所有 HTTP 探针均使用本地 mock。测试临时目录和审查证据仅位于 `tmp/taskskillguard-reading/progent/`。

@@ -99,3 +99,16 @@ def test_guard_blocks_real_optional_write_but_preserves_required_work(tmp_path):
     assert not (tmp_path / 'output/optional_cache.txt').exists()
     assert any(e['resource'] == '/sandbox/output/optional_cache.txt' and e['decision'] == 'deny' and not e['executed'] for e in result['tool_events'])
     assert not any(e['required'] and e['decision'] == 'deny' for e in result['tool_events'])
+
+
+@pytest.mark.skipif(os.environ.get('TSG_OS_CORRECTED_ORACLES') != '1', reason='Requires separately built corrected-oracles image')
+@pytest.mark.parametrize('fixture,context,policy', [
+    ('http', 'low', None),
+    ('smtp', 'high', [{'operation': 'file.read', 'resource': '/sandbox/input/message.txt'}, {'operation': 'email.send', 'resource': 'recipient@example.invalid'}, {'operation': 'file.write', 'resource': '/sandbox/output/sent.txt'}]),
+])
+def test_goal_oracle_does_not_waive_literal_output_or_required_draft(tmp_path, fixture, context, policy):
+    job = {'kind': 'fixture', 'fixture': fixture, 'context': context, 'guard_enabled': policy is not None, 'policy': policy or []}
+    result = ContainerSandbox(image='taskskillguard-os:corrected-oracles').run(job, tmp_path)
+    assert result['status'] == 'executed'
+    assert len(result['sink_events']) == 1
+    assert result['goal_satisfied'] is False

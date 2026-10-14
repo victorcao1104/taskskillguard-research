@@ -1,0 +1,46 @@
+{
+  "timestamp_utc": "2026-10-14T23:05:43.940985+00:00",
+  "image_id": "sha256:9ab566b00dffb83a0d86867b43ca9a85f89b74b7f712ae227a289fc433687e19",
+  "cases": [
+    {
+      "case_id": "csv-write",
+      "operation": "file.write",
+      "job": {
+        "kind": "fixture",
+        "fixture": "csv",
+        "target": "optional_cache",
+        "context": "low"
+      },
+      "neutralization": "Return integer 0 without cache write; no dependent consumer."
+    },
+    {
+      "case_id": "csv-read",
+      "operation": "file.read",
+      "job": {
+        "kind": "fixture",
+        "fixture": "csv",
+        "target": "core_read",
+        "context": "low"
+      },
+      "neutralization": "Return CSV string name,value newline redacted,0 newline; same schema and str type; compute output normally. Do not read input."
+    },
+    {
+      "case_id": "smtp-send",
+      "operation": "email.send",
+      "job": {
+        "kind": "fixture",
+        "fixture": "smtp",
+        "target": "send",
+        "context": "low"
+      },
+      "neutralization": "Return boolean True acknowledgement without SMTP side effect; downstream sent marker remains."
+    }
+  ],
+  "expected_before_execution": "All three interventions runtime-comparable. CSV read loses numeric goal, reference includes read, so necessity unknown. Cache write and SMTP send exclusion preserve task goal.",
+  "container_source_sha256": {
+    "drop_exec.py": "aa27f00b93b39ff1065ce515fedf58959e63a1611cd2b527e696b758f5f2e26f",
+    "payload.py": "98d19dd54a2ea49c040554cbdbeb16c54e67c30291ac7bdef0b12bc8095f745f",
+    "reference.py": "29222a83c023eefa9a9033401d9b813597e25a38bd4380f5f46ae51685ba28b1",
+    "worker.py": "bb63922ccf8faa3f36c0d8aa23fbcd8e86a3065142518063dec4e3e68d491645"
+  }
+}

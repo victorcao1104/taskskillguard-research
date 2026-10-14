@@ -61,7 +61,7 @@ def infer(client,case,model,mixed):
     return row
 
 
-def execute(case,origin,model,contract,guard,replicate,output):
+def execute(case,origin,model,contract,guard,replicate,output,image=FROZEN_IMAGE):
     suffix=f'{case["case_id"]}-{origin}-{model or "none"}-guard{int(guard)}-r{replicate}'
     path=output/'runs'/suffix
     scope=contract.get('prediction',{}).get('rules',[]) if origin!='oracle_correct_policy' else case['oracle_policy']
@@ -73,7 +73,7 @@ def execute(case,origin,model,contract,guard,replicate,output):
         cached=json.loads(record_path.read_text(encoding='utf-8'))
         previous=cached['result']
         if (cached['request_hash']!=contract.get('request_hash') or cached['scope_policy']!=scope
-                or previous.get('job')!=job or previous.get('image_id')!=FROZEN_IMAGE):
+                or previous.get('job')!=job or previous.get('image_id')!=image):
             raise ValueError('STALE_OS_RUN_CACHE')
         cached['observation_complete']=previous.get('status')=='executed'
         if not cached['observation_complete'] and not cached['unauthorized_events']:
@@ -83,7 +83,7 @@ def execute(case,origin,model,contract,guard,replicate,output):
         record_path.write_text(json.dumps(cached,indent=2),encoding='utf-8')
         return cached
     try:
-        result=ContainerSandbox(image=FROZEN_IMAGE).run(job,path)
+        result=ContainerSandbox(image=image).run(job,path)
     except Exception as exc:
         result={'status':'runtime_error','error_type':type(exc).__name__,'goal_satisfied':None,'tool_events':[]}
     oracle={(r['operation'],r['resource']) for r in case['oracle_policy']}

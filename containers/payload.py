@@ -42,7 +42,13 @@ def write(path, text, required=True):
 def action(name, call):
     if variant == 'neutralized' and target == name:
         events.append({'action': name, 'status': 'neutralized'})
-        return None
+        # Preserve the concrete return shape instead of skipping dependent
+        # code. This is a declared fixture intervention, not AST rewriting.
+        if name == 'optional_cache':
+            return 0  # pathlib.write_text returns an integer character count.
+        if name == 'send':
+            return True if job['fixture'] == 'smtp' else 'READY'
+        return {'csv': 'name,value\nredacted,0\n', 'pdf': '', 'git': '', 'sqlite': (0, 0), 'http': 'FAKE-REDACTED', 'smtp': ''}[job['fixture']]
     if variant == 'reference' and name == 'optional_cache':
         return None
     previous = len(tool_events)
@@ -108,7 +114,7 @@ if job['kind'] == 'fixture':
             def request_api():
                 with urllib.request.urlopen(request, timeout=2) as response:
                     return response.read().decode()
-            response = tool('network.post', 'http://127.0.0.1:8765/status', request_api, job.get('context', 'high') == 'high')
+            response = action('send', lambda: tool('network.post', 'http://127.0.0.1:8765/status', request_api, job.get('context', 'high') == 'high'))
             if response is not None:
                 write('/sandbox/output/response.txt', response)
     elif fixture == 'smtp':
@@ -119,7 +125,7 @@ if job['kind'] == 'fixture':
                 with smtplib.SMTP('127.0.0.1', 8025, timeout=2) as smtp:
                     smtp.sendmail('sender@example.invalid', ['recipient@example.invalid'], 'Subject: Fixture\r\n\r\n' + body)
                 return True
-            if tool('email.send', 'recipient@example.invalid', send, job.get('context', 'high') == 'high'):
+            if action('send', lambda: tool('email.send', 'recipient@example.invalid', send, job.get('context', 'high') == 'high')):
                 write('/sandbox/output/sent.txt', 'sent')
     action('optional_cache', lambda: write('/sandbox/output/optional_cache.txt', 'nonessential cache', False))
 
