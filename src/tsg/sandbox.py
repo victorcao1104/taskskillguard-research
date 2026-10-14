@@ -39,7 +39,7 @@ def transform(kind, text):
     raise ValueError('UNSUPPORTED_TRANSFORM')
 
 
-def run_case(case, mode='v5', neutralize=None, actions=None, policy=None, options=None):
+def run_case(case, mode='v5', neutralize=None, actions=None, policy=None, options=None, guard_factory=None, reference_actions=None):
     settings={**MODES[mode],**(options or {})}
     started=time.perf_counter()
     state_id=str(uuid.uuid4())
@@ -48,7 +48,8 @@ def run_case(case, mode='v5', neutralize=None, actions=None, policy=None, option
            '/sandbox/fake_secrets/token.txt':LabeledValue('TSG_FAKE_TOKEN_ONLY',frozenset({'mock-secret'}),frozenset({'user'})),
            '/sandbox/unrelated/notes.txt':LabeledValue('unrelated fixture',frozenset({'unrelated'}),frozenset({'user'}))}
     values={'public_status':LabeledValue('DONE',frozenset({'trusted-literal'}),None)}
-    g=Guard(Policy.from_dict(policy or case['policy']),taint=settings['taint'],lease=settings['lease'])
+    selected_policy=Policy.from_dict(policy or case['policy'])
+    g=(guard_factory(selected_policy,settings) if guard_factory else Guard(selected_policy,taint=settings['taint'],lease=settings['lease']))
     events=[];sink_events=[];outputs={};reference_recoveries=0;recovery_evidence=[]
     oracle_counts={}
     original_actions=actions if actions is not None else case['actions']
@@ -59,9 +60,9 @@ def run_case(case, mode='v5', neutralize=None, actions=None, policy=None, option
             events.append({**event,'reason_code':'NEUTRALIZED'});continue
         if a.get('requires') and a['requires'] not in values:
             prerequisite=next((p for p in original_actions if p.get('result')==a['requires']),None)
-            reference=reference_run(case) if settings['triangulate'] else None
+            reference=(run_case(case,'none',actions=reference_actions) if reference_actions is not None else reference_run(case)) if settings['triangulate'] else None
             excluded=prerequisite is not None and not any(e['executed'] and e['operation']==prerequisite['operation'] and e['resource']==prerequisite['resource'] for e in reference['events']) if reference else False
-            if reference and reference['goal_satisfied'] and excluded and not g.policy.allows(prerequisite['operation'],prerequisite['resource'],runtime_step,temporal=False):
+            if reference and reference['goal_satisfied'] and not reference['unauthorized_executed'] and excluded and not g.policy.allows(prerequisite['operation'],prerequisite['resource'],runtime_step,temporal=False):
                 reference_recoveries+=1
                 recovery_evidence.append({'prerequisite_action':prerequisite['id'],'reference':reference,'reference_excludes_prerequisite':True})
             else:

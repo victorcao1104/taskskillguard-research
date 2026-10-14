@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tsg:contract:v2",
+  "title": "TSG bounded capability contract v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_id", "task_id", "skill_id", "policy_version", "authority_source", "rules", "default_action", "review_on_unknown"],
+  "properties": {
+    "contract_id": {"$ref": "#/$defs/id"},
+    "task_id": {"$ref": "#/$defs/id"},
+    "skill_id": {"$ref": "#/$defs/id"},
+    "policy_version": {"type": "integer", "minimum": 1},
+    "authority_source": {"enum": ["trusted_user_request", "trusted_administrator", "proposed"]},
+    "default_action": {"const": "deny"},
+    "review_on_unknown": {"const": true},
+    "rules": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/rule"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "scalar": {"type": ["string", "integer", "boolean"], "maxLength": 512},
+    "scalar_schema": {
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": {
+        "type": {"enum": ["string", "integer", "boolean"]},
+        "enum": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/scalar"}},
+        "const": {"$ref": "#/$defs/scalar"},
+        "minimum": {"type": "integer"},
+        "maximum": {"type": "integer"},
+        "exclusiveMinimum": {"type": "integer"},
+        "exclusiveMaximum": {"type": "integer"}
+      }
+    },
+    "parameters": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "properties", "additionalProperties"],
+      "properties": {
+        "type": {"const": "object"},
+        "properties": {
+          "type": "object", "maxProperties": 16,
+          "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"},
+          "additionalProperties": {"$ref": "#/$defs/scalar_schema"}
+        },
+        "required": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string"}},
+        "additionalProperties": {"const": false}
+      }
+    },
+    "resource": {
+      "oneOf": [
+        {"type": "string", "minLength": 1, "maxLength": 512},
+        {"type": "object", "additionalProperties": false, "required": ["path_prefix"], "properties": {"path_prefix": {"type": "string", "maxLength": 512}}},
+        {"type": "object", "additionalProperties": false, "required": ["domains"], "properties": {"domains": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "maxLength": 253}}}}
+      ]
+    },
+    "rule": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rule_id", "effect", "operation", "resource"],
+      "properties": {
+        "rule_id": {"$ref": "#/$defs/id"},
+        "effect": {"enum": ["allow", "forbid"]},
+        "operation": {"enum": ["file.read", "file.write", "file.delete", "secret.read", "network.get", "network.post", "email.read", "email.send", "db.read", "db.write", "command.exec", "process.spawn"]},
+        "resource": {"$ref": "#/$defs/resource"},
+        "parameters": {"$ref": "#/$defs/parameters"},
+        "purpose": {"type": "string", "maxLength": 512},
+        "starts_at_step": {"type": "integer", "minimum": 0},
+        "expires_after_step": {"type": "integer", "minimum": 0},
+        "allowed_stages": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "max_uses": {"type": "integer", "minimum": 0},
+        "approval_id": {"$ref": "#/$defs/id"},
+        "evidence_ids": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"effect": {"const": "allow"}}}, "then": {"required": ["approval_id", "evidence_ids"]}},
+        {"if": {"properties": {"effect": {"const": "forbid"}}}, "then": {"not": {"required": ["max_uses"]}}}
+      ]
+    }
+  }
+}
