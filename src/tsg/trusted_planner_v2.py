@@ -67,7 +67,7 @@ def parse_plan(text, case):
         raise ValueError('INVALID_P_OUTPUT')
     if not isinstance(obj['plan'],list) or len(obj['plan'])>12 or any(x not in {'read_input','transform','write_output','send_status'} for x in obj['plan']):
         raise ValueError('INVALID_P_PLAN')
-    if not isinstance(obj['rules'],list) or not all(isinstance(r,dict) and set(r)=={'operation','resource'} and isinstance(r['operation'],str) and isinstance(r['resource'],str) for r in obj['rules']):
+    if not isinstance(obj['rules'],list) or not all(isinstance(r,dict) and set(r)=={'operation','resource'} and r['operation'] in {'file.read','file.write','network.post'} and isinstance(r['resource'],str) for r in obj['rules']):
         raise ValueError('INVALID_P_RULES')
     if not isinstance(obj['unknowns'],list) or not all(isinstance(x,str) for x in obj['unknowns']):
         raise ValueError('INVALID_P_UNKNOWNS')
