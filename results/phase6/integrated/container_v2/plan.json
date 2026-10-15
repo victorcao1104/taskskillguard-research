@@ -1,0 +1,41 @@
+{
+  "amendment": "override inherited image ENTRYPOINT; same frozen runtime and jobs, no host mounts/network",
+  "args": [
+    "docker",
+    "run",
+    "--rm",
+    "-i",
+    "--network",
+    "none",
+    "--read-only",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--pids-limit",
+    "64",
+    "--memory",
+    "256m",
+    "--cpus",
+    "1",
+    "--user",
+    "65534:65534",
+    "--tmpfs",
+    "/tmp:rw,noexec,nosuid,size=64m",
+    "--entrypoint",
+    "python3",
+    "sha256:c2b1b937174f8826eb24ce3616023c78ea50a5aa98b73fee913a13506a365244",
+    "-I",
+    "-B",
+    "-c",
+    "import json,sys,types,os\np=json.load(sys.stdin)\npkg=types.ModuleType(\"tsg\");pkg.__path__=[];sys.modules[\"tsg\"]=pkg\nfor name,source in p[\"modules\"].items():\n    m=types.ModuleType(name);sys.modules[name]=m\n    exec(compile(source,name+\".py\",\"exec\"),m.__dict__)\nruntime=sys.modules[\"tsg.runtime_v6\"]\nrows=[]\nfor j in p[\"jobs\"]:\n    try:\n        fun=(sys.modules[\"tsg.selection_v6\"].execute_selection if j[\"args\"][\"mode\"] in (\"first_feasible\",\"search_equal\") else runtime.execute)\n        rows.append({**j[\"meta\"],\"result\":fun(**j[\"args\"]),\"runner_status\":\"completed\"})\n    except Exception as e:\n        rows.append({**j[\"meta\"],\"runner_status\":\"error\",\"exception\":type(e).__name__+\": \"+str(e)})\njson.dump({\"uid\":os.getuid(),\"rows\":rows},sys.stdout,sort_keys=True)\n"
+  ],
+  "conditions": 1440,
+  "container_count": 1,
+  "image": "sha256:c2b1b937174f8826eb24ce3616023c78ea50a5aa98b73fee913a13506a365244",
+  "jobs_sha256": "0e4cd5b8809ba7fa491227bb33840c80cd9631a6bd1048c2ac554e36b2aab979",
+  "modules_sha256": {
+    "tsg.runtime_v6": "a1568edf517b77f31f2133138987fae4d035237da1ba56c2e21529cef4b299b1"
+  },
+  "payload_sha256": "e448a94d130645c9a25a490271c3db7c864aade1db6d9972b832dd5547e9c80a"
+}

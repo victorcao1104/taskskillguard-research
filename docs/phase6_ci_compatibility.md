@@ -1,0 +1,5 @@
+# Publication compatibility amendment
+
+After the initial offline release verification, inspection of historical CI workflows showed that Phase2–4 install the preserved base requirements without optional tiktoken. One new independent graph-input review test used tiktoken without an optional dependency skip. It now uses `pytest.importorskip('tiktoken')`, matching the other optional tokenizer tests. Phase5/6 CI explicitly install it and run the test. No experimental code, labels, request, response, runtime outcome, budget or historical baseline file changes.
+
+The initial release manifest and verification remain under their original names. Pre-amendment copies of changed test/publication files are saved under `results/phase6/provenance/pre_ci_compatibility/`. Current release verification uses `release_hashes_v2.json` and `release_verification_v2.json`; the v2 manifest also hashes the old manifest, verification, and preserved originals. This is a publication/test-environment adjustment, not a rerun or correction of experiment outcomes.
