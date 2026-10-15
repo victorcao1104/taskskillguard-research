@@ -1,0 +1,17 @@
+name: Phase five evidence checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  phase5:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r configs/requirements-lock.txt -r configs/phase5-requirements.txt
+      - run: mkdir -p work
+      - run: python -m pytest -q --basetemp work/phase5-ci-tests
+      - name: Verify preserved prior files and complete phase-five evidence
+        run: python scripts/verify_phase5_release.py
