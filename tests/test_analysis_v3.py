@@ -1,5 +1,6 @@
 """Analysis denominators and paired uncertainty, using hand-derived fixtures."""
 import importlib
+import copy
 import json
 from pathlib import Path
 
@@ -202,3 +203,75 @@ def test_budget_matches_historical_raw_separately_from_new_raw(tmp_path):
     assert s['historical_reservations_with_raw']==1
     assert s['incremental_reservations_missing_new_raw']==[]
     assert s['historical_reservations_missing_old_raw']==[]
+
+
+def legacy_runtime(case_id='a', **changes):
+    row = runtime(case_id)
+    row.update(row.pop('result'))
+    row.update(q_plan_status='valid', p_declared_unknowns=[])
+    row.update(changes)
+    return row
+
+
+def test_legacy_declared_unknowns_remove_decision_credit_without_rewriting_old_rows():
+    rows = [legacy_runtime(p_declared_unknowns=['The transformation is undefined.']),
+            legacy_runtime('b'), legacy_runtime('c')]
+    rows[1]['run']['goal_satisfied'] = False
+    before = copy.deepcopy(rows)
+    summary = api().summarize_runtime(rows, {key: {'malicious': False} for key in ('a', 'b', 'c')},
+                                      q_status_mode='historical_assumed')
+    assert summary['decided_conditions'] == 2
+    assert summary['confirmed_completion'] == 1
+    assert summary['completion_rate_all_planned'] == 1 / 3
+    assert summary['completion_rate_decided'] == 1 / 2
+    assert summary['status_counts'] == {'uncertainty_declared_policy': 1, 'valid': 2}
+    assert summary['original_status_counts'] == {'valid': 3}
+    assert summary['historical_planner_uncertainty']['uncertainty_affected_valid_conditions'] == 1
+    assert summary['historical_planner_uncertainty']['evidence_source'] == 'saved_p_declared_unknowns'
+    assert rows == before
+
+
+@pytest.mark.parametrize('unknowns', [None, 'not an array', {'reason': 'unclear'}, ['unclear', 4]])
+def test_malformed_legacy_unknown_evidence_never_defaults_to_a_decision(unknowns):
+    row = legacy_runtime(p_declared_unknowns=unknowns)
+    summary = api().summarize_runtime([row], {'a': {'malicious': False}}, q_status_mode='historical_assumed')
+    assert summary['decided_conditions'] == 0
+    assert summary['status_counts'] == {'unverified_policy_evidence': 1}
+
+
+def test_absent_legacy_unknown_evidence_never_defaults_to_a_decision():
+    row = legacy_runtime()
+    row.pop('p_declared_unknowns')
+    summary = api().summarize_runtime([row], {'a': {'malicious': False}}, q_status_mode='historical_assumed')
+    assert summary['decided_conditions'] == 0
+    assert summary['historical_planner_uncertainty']['missing_field_conditions'] == 1
+
+
+def test_original_legacy_policy_failures_keep_their_status_and_new_warning_runs_stay_decided():
+    old = legacy_runtime(status='unresolved_policy', p_declared_unknowns=['reason'])
+    new = runtime('b', semantic_diagnostics={'unknown_warnings': ['Optional telemetry target is unspecified.']})
+    summary = api().summarize_runtime([old, new], {'a': {'malicious': False}, 'b': {'malicious': False}},
+                                      q_status_mode='historical_assumed')
+    assert summary['decided_conditions'] == summary['confirmed_completion'] == 1
+    assert summary['status_counts'] == {'unresolved_policy': 1, 'valid': 1}
+
+
+def test_historical_full_counts_reconcile_with_published_phase_two_denominators():
+    root = Path(__file__).resolve().parents[1]
+    old_path = root / 'results/phase2/pipeline/ablation_full.jsonl'
+    before = old_path.read_bytes()
+    rows = [json.loads(line) for line in before.decode('utf-8').splitlines() if line.strip()]
+    cases = {c['case_id']: c for c in api().read_rows(root / 'data/benchmark/synthetic_cases.jsonl')}
+    expected = {
+        ('gpt-6-luna', 'development'): (132, 119, 83),
+        ('gpt-6-luna', 'validation'): (44, 38, 30),
+        ('gpt-6-luna', 'held_out_test'): (88, 69, 50),
+        ('gpt-4.1-mini', 'development'): (132, 3, 3),
+        ('gpt-4.1-mini', 'validation'): (44, 0, 0),
+        ('gpt-4.1-mini', 'held_out_test'): (88, 0, 0),
+    }
+    for (model, split), counts in expected.items():
+        group = [r for r in rows if r['model'] == model and r['split'] == split]
+        summary = api().summarize_runtime(group, cases, q_status_mode='historical_assumed', include_groups=False)
+        assert (summary['planned_conditions'], summary['decided_conditions'], summary['confirmed_completion']) == counts
+    assert old_path.read_bytes() == before

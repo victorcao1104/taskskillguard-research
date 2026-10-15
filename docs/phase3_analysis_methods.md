@@ -27,6 +27,10 @@ Duplicate or unexpected condition identities are rejected for the factorial, syn
 
 VM decided status requires runtime status `valid`, P protocol valid, Q protocol valid, and Boolean scored outcomes. The historical same-input track explicitly assumes missing Q validity true because that historical format did not retain the new flag; the old executor's explicit `q_plan_status` remains required. Fixed-contract mechanisms explicitly use their fixed-control Q status. No such assumption is applied to fresh model runs.
 
+The historical **before** rows also require a well-formed empty `p_declared_unknowns` array. All 528 saved old full-ablation rows contain this explicit field. A nonempty declaration changes the analysis-only effective status of an otherwise valid legacy row to `uncertainty_declared_policy`, consistent with the established phase-two analyzer. A missing or malformed field becomes `unverified_policy_evidence`; it never defaults to an empty declaration. Original unresolved-policy and other failure statuses remain unchanged. This rule is limited to the old flat runtime format: phase-three nested results retain their recorded blocking-versus-warning decisions.
+
+`historical_planner_uncertainty` exports the evidence source, field-shape coverage, declared-uncertainty counts and request hashes, and the number of otherwise-valid rows affected. `status_counts` reports effective analysis statuses; `original_status_counts` preserves the saved status distribution. `historical_same_inputs.before_evidence` records the unchanged old file path and SHA256. This uses saved explicit declarations and does not reinterpret raw responses or rewrite any row. Confirmed completion still requires a decided run and its actual Boolean goal result; semantic execution failures are never promoted to success.
+
 Confirmed completion is `decided AND goal_satisfied`. Two denominators are exported:
 
 - `completion_rate_all_planned`: confirmed completions / all planned conditions. Unknown, invalid, and absent conditions receive no confirmed-success credit.
@@ -71,3 +75,18 @@ Historical request hashes and reservation matching use the historical raw direct
 All tests are offline and hand-derived. Initial analysis RED: 10 failed because the new module was absent. First GREEN: 10 passed. Four additional boundary tests (factorial interaction, Q diagnostics, paired safety missingness, OS planned denominator/duplicates) were observed failing, then all 14 passed. Independent review identified schema-valid OS abstentions incorrectly counted as decided: the regression failed with 2 versus expected 0, then the authoritative-flag fix produced 15 passing analysis tests. The full suite at that checkpoint was 266 passed, 4 skipped in 6.80s. A final historical/new raw-matching test failed on missing audit fields, then all 16 analysis tests passed in 0.19s. Progress-mode end-to-end runs successfully produced explicitly partial JSON summaries without altering experiment evidence.
 
 Final analysis handoff verification: `.venv/Scripts/python.exe -m pytest -q --tb=short --basetemp=work/phase3-analysis-final-suite` produced **268 passed, 4 skipped** in 7.04s. Tests cover planned versus decided denominators, fixed malicious opportunities despite an empty selected attack plan, malformed/absent decision flags, unknown case rejection, preserved nested reach, shared request hashes, family-balanced deterministic resampling, duplicate pair rejection, missing paired outcomes, empty-candidate non-applicability, immutable historical ledger prefix, retained unknown costs, required track coverage, and separated raw-response inventories.
+
+### Review correction: historical planner uncertainty
+
+Independent review found that the original phase-three historical adapter counted an old `status=valid` row as decided even when its saved P declaration was nonempty. Seven new regression cases first failed, including the real development count of 132 decided / 84 completed instead of the established 119 / 83. The adapter now honours the explicit legacy declaration without changing source rows. All **24 analysis tests** passed after the correction. The saved historical counts reconcile as follows:
+
+| Model | Split | All conditions | Decided | Confirmed completed |
+| --- | --- | ---: | ---: | ---: |
+| gpt-6-luna | development | 132 | 119 | 83 |
+| gpt-6-luna | validation | 44 | 38 | 30 |
+| gpt-6-luna | held_out_test | 88 | 69 | 50 |
+| gpt-4.1-mini | development | 132 | 3 | 3 |
+| gpt-4.1-mini | validation | 44 | 0 | 0 |
+| gpt-4.1-mini | held_out_test | 88 | 0 | 0 |
+
+The regression verifies unchanged old-file bytes, preservation of actual failed goals and existing invalid statuses, conservative handling of missing or malformed evidence, and continued decided credit for fresh phase-three warning-only runs. The full-suite snapshot after this correction passed **302 tests, 4 skipped**. This is an offline reporting correction; acquisition, model prompts, the executor, after-condition outcomes, and historical artifacts remain unchanged.

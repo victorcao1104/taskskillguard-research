@@ -1,0 +1,25 @@
+name: Phase three evidence checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  phase3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r configs/requirements-lock.txt
+      - run: mkdir -p work
+      - run: python -m pytest -q --basetemp work/phase3-ci-tests
+      - name: Verify saved phase-three evidence
+        shell: bash
+        run: |
+          if test -f results/phase3/provenance/release_manifest.json; then
+            python scripts/verify_phase3_release.py
+          else
+            python scripts/verify_phase3_release.py --allow-partial
+          fi

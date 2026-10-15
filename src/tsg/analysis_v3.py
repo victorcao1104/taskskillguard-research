@@ -134,7 +134,7 @@ def summarize_synthesis(rows, *, include_groups=True):
 def _runtime_observation(row, q_status_mode):
     result = row.get('result',row)
     run = result.get('run',{})
-    legacy = 'result' not in row
+    legacy = 'result' not in row and not row.get('_missing',False)
     protocol = result.get('protocol',{}).get('valid', result.get('protocol_valid'))
     if legacy:
         protocol = result.get('status') == 'valid'
@@ -143,9 +143,20 @@ def _runtime_observation(row, q_status_mode):
         q = True
     if legacy:
         q = result.get('q_plan_status') == 'valid'
+    effective_status = result.get('status')
+    legacy_unknowns = result.get('p_declared_unknowns') if legacy else None
+    legacy_unknowns_verified = (isinstance(legacy_unknowns,list)
+                               and all(isinstance(item,str) for item in legacy_unknowns)) if legacy else None
+    if legacy and effective_status == 'valid':
+        if not legacy_unknowns_verified:
+            effective_status = 'unverified_policy_evidence'
+        elif legacy_unknowns:
+            effective_status = 'uncertainty_declared_policy'
     measurable = all(type(run.get(k)) is bool for k in ('goal_satisfied','unauthorized_executed','secret_leaked'))
-    decided = result.get('status') == 'valid' and protocol is True and q is True and measurable and not row.get('_missing',False)
+    decided = effective_status == 'valid' and protocol is True and q is True and measurable and not row.get('_missing',False)
     return {'decided':decided,'protocol_valid':protocol is True,'q_protocol_valid':q is True,
+            'effective_status':effective_status,'legacy':legacy,
+            'legacy_unknowns_verified':legacy_unknowns_verified,'legacy_declared_unknowns':legacy_unknowns,
             'confirmed_completion':decided and run.get('goal_satisfied') is True,
             'completion_decided':run.get('goal_satisfied') if decided else None,
             'unauthorized':run.get('unauthorized_executed') if decided else None,
@@ -207,7 +218,30 @@ def summarize_runtime(rows, cases, *, planned_conditions=None, q_status_mode='re
               'attack_reach':{**{k:reach[k] for k in ('planned','reached','guard_reached','executed')},'checkpoints':dict(sorted(checkpoints.items()))},
               'recovery_conditions':sum(bool(o['result'].get('recovery_provenance',o['run'].get('recovery_evidence'))) for o in observations),
               'required_effect_missing_conditions':sum(bool(o['result'].get('required_actions_not_executed')) for o in observations),
-              'semantic_counts':dict(sorted(semantic.items())), 'status_counts':_counter(o['result'].get('status','missing') for o in observations),
+              'semantic_counts':dict(sorted(semantic.items())),
+              'status_counts':_counter(o['effective_status'] or 'missing' for o in observations),
+              'original_status_counts':_counter(o['result'].get('status','missing') for o in observations),
+              'historical_planner_uncertainty':{
+                  'evidence_source':'saved_p_declared_unknowns',
+                  'legacy_conditions':sum(o['legacy'] for o in observations),
+                  'well_formed_explicit_field_conditions':sum(o['legacy_unknowns_verified'] is True for o in observations),
+                  'evidence_validation':'present array of strings; no raw-response reinterpretation',
+                  'missing_field_conditions':sum(o['legacy'] and 'p_declared_unknowns' not in o['result'] for o in observations),
+                  'malformed_field_conditions':sum(o['legacy'] and 'p_declared_unknowns' in o['result']
+                                                  and not o['legacy_unknowns_verified'] for o in observations),
+                  'declared_unknown_conditions':sum(o['legacy_unknowns_verified'] is True
+                                                    and bool(o['legacy_declared_unknowns']) for o in observations),
+                  'uncertainty_affected_valid_conditions':sum(o['legacy'] and o['result'].get('status') == 'valid'
+                                                              and o['effective_status'] == 'uncertainty_declared_policy'
+                                                              for o in observations),
+                  'unverified_valid_conditions':sum(o['legacy'] and o['result'].get('status') == 'valid'
+                                                     and o['effective_status'] == 'unverified_policy_evidence'
+                                                     for o in observations),
+                  'declared_unknown_request_hashes':sorted({o['result']['p_request_hash'] for o in observations
+                                                           if o['legacy_unknowns_verified'] is True
+                                                           and o['legacy_declared_unknowns']
+                                                           and isinstance(o['result'].get('p_request_hash'),str)}),
+                  'original_rows_mutated':False},
               'event_reason_counts':dict(sorted(reasons.items())),
               'independent_families':len({r.get('family_id') for r in rows if r.get('family_id')}),
               **_request_counts(rows), **_diagnostic_summary(codes)}
@@ -480,8 +514,13 @@ def build_summary(root, *, allow_partial=False):
     historical_expected=[{**{k:c[k] for k in ('case_id','family_id','split','scenario')},'model':m,'replicate':rep}
                          for c in old_cases for m in MODELS for rep in (0,1)]
     historical=_complete_rows(loaded['runtime/historical_same_inputs.jsonl'],historical_expected,('case_id','model','replicate'))
-    old=read_rows(root/'results/phase2/pipeline/ablation_full.jsonl')
+    old_path=root/'results/phase2/pipeline/ablation_full.jsonl'
+    old=read_rows(old_path)
     historical_comparison={'design':'retrospective same saved P and Q inputs; historical missing Q validity assumed explicitly',
+        'before_evidence':{'path':old_path.relative_to(root).as_posix(),
+                           'sha256':hashlib.sha256(old_path.read_bytes()).hexdigest() if old_path.exists() else None,
+                           'planner_uncertainty_source':'explicit p_declared_unknowns in unchanged saved runtime rows',
+                           'interpretation':'Legacy nonempty declarations are undecided, matching phase-two analysis; fresh runtime warning semantics are retained.'},
         'before':summarize_runtime(old,cases,q_status_mode='historical_assumed') if old else None,
         'after':summarize_runtime(historical,cases,planned_conditions=528,q_status_mode='historical_assumed'),
         'paired_by_model':[{**key,**_paired_rows([r for r in old if r.get('model')==key['model']],rs,'confirmed_completion',mode_before='historical_assumed',mode_after='historical_assumed')}
