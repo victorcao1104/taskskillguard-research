@@ -66,8 +66,8 @@ def infer_synthesis(client, job):
                        tag=job['job_id']+':Q', max_output=1000, replicate=job['replicate'],
                        response_schema=schema)
     q = validate_record(raw_q,schema)
-    prediction = q['prediction'] or {}
-    ids = prediction.get('action_ids',[])
+    # Invalid JSON shapes remain observations; inspect IDs only after schema validation.
+    ids = q['prediction']['action_ids'] if q['protocol_valid'] else []
     if len(ids) != len(set(ids)):
         q['protocol_valid'] = False
         q['diagnostic_codes'].append('Q_DUPLICATE_ACTION')

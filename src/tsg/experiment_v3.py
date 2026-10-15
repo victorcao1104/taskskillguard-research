@@ -3,6 +3,7 @@ import hashlib
 import itertools
 import json
 import subprocess
+import time
 from pathlib import Path
 from .trusted_planner_v2 import task_spec
 
@@ -19,7 +20,16 @@ def write_rows(path, records):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.tmp')
     temporary.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in records), encoding='utf-8')
-    temporary.replace(path)
+    # Windows readers/indexers can briefly hold the destination. Retry only the
+    # local atomic replacement, never the paid model request. Leave .tmp on failure.
+    for attempt in range(8):
+        try:
+            temporary.replace(path)
+            break
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(min(0.05 * 2 ** attempt, 1.0))
 
 
 def save_json(path, obj):
@@ -85,7 +95,9 @@ def freeze(root, *, stage='formal'):
                    | {root/'docs/phase3_design.md',root/'docs/phase3_plan.md'})
     # Analysis implementation is independently release-hashed; acquisition and
     # execution cannot drift while it is developed against predeclared endpoints.
-    paths = [p for p in paths if p.name not in {'analysis_v3.py','test_analysis_v3.py','analyze_phase3.py'}]
+    paths = [p for p in paths if p.name not in {
+        'analysis_v3.py','test_analysis_v3.py','analyze_phase3.py',
+        'verify_phase3_release.py','test_release_v3.py','report_phase3.py'}]
     return {'stage':stage, 'baseline_commit':BASELINE,
             'code_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
             'files_sha256':{p.relative_to(root).as_posix():sha(p) for p in paths},

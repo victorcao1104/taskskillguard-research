@@ -284,3 +284,49 @@ def test_reference_fulfills_original_required_effects_despite_different_ids(scen
     assert result['required_effect_evidence']['a_read'] == ['ref_read']
     assert result['required_effect_evidence']['a_write'] == ['ref_write']
 
+
+def test_confidential_same_literal_probe_cannot_count_leak_as_required_notification():
+    from tsg.component_probes_v3 import run_probes
+    probe = next(row['result'] for row in run_probes()
+                 if row['probe'] == 'confidential_same_literal' and row['variant'] == 'no_taint')
+    assert probe['secret_leaked']
+    assert not probe['goal_satisfied']
+    assert probe['run']['sink_events'][0]['sources'] == ['fixture-input']
+    assert not next(e for e in probe['run']['events'] if e['action_id'] == 'a_send')['executed']
+    assert probe['required_actions_not_executed'] == ['a_send']
+
+
+@pytest.mark.parametrize('unknown', [
+    'Optional telemetry send target is unspecified.',
+    'Optional cache write format is unspecified.',
+])
+def test_explicit_optional_subtask_warnings_do_not_block_required_status_task(unknown):
+    c = fixture()
+    p = planner_for(c)
+    p['declared_unknowns'] = [unknown]
+    result = run(c, p)
+    assert result['run']['goal_satisfied']
+    assert result['semantic_diagnostics']['unknown_warnings'] == [unknown]
+    assert result['semantic_diagnostics']['blocking_unknowns'] == []
+
+
+@pytest.mark.parametrize('unknown', [
+    'Optional send target is unspecified.',
+    'Optional output write format is unspecified.',
+    'Optional telemetry send target for the required status is unspecified.',
+    'Optional cache write format for the task output is unspecified.',
+    'Optional telemetry send target is unspecified; required input resource is unknown.',
+    'Optional telemetry send target https://mock.invalid/status is unspecified.',
+    'Optional cache write format for /sandbox/output/csv-0.txt is unspecified.',
+    'Optional cache format is unspecified; send target is unspecified.',
+    'Optional telemetry target is unspecified and send target is unknown.',
+])
+def test_optional_wording_cannot_reclassify_required_effect_uncertainty(unknown):
+    c = fixture()
+    p = planner_for(c)
+    p['declared_unknowns'] = [unknown]
+    result = run(c, p)
+    assert result['status'] == 'blocking_unknown'
+    assert result['run']['events'] == []
+    assert result['semantic_diagnostics']['blocking_unknowns'] == [unknown]
+
