@@ -7,9 +7,12 @@
 需要 Python3.12 和 `configs/requirements-lock.txt`。仓库内的命令不依赖模型密钥，也不执行真实 Skill。
 
 ```console
+python -c "from pathlib import Path; Path('work').mkdir(exist_ok=True)"
 python -m pytest -q --basetemp work/phase4-tests
-python scripts/verify_phase4_release.py --hash-manifest results/phase4/provenance/release_hashes.json
+python scripts/verify_phase4_release.py --hash-manifest results/phase4/provenance/release_hashes_v2.json
 ```
+
+首次远端第四轮CI漏建 `work/`，在全新检出时触发临时目录创建失败；原运行记录保留。修订仅补目录创建和复现说明，实验请求、响应、费用与统计不变。`release_hashes.json` 对应首发布提交 b24f8dfa；当前配置修订使用追加的 `release_hashes_v2.json`，修订依据见 `provenance/ci_amendment.json`。
 
 核验包括旧文件、批准的有界源文本、冻结请求哈希、响应与解析一致性、完整条件网格、历史费用前缀、预留与结算、Replay 原始回执和评分、独立家族统计，以及未提供真人真值的限制。哈希验证的是保存文件之间的一致性，不是供应商签名、账单或对历史容器隔离的密码学证明。
 
