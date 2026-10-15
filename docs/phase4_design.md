@@ -2,6 +2,8 @@
 
 ## User intent and retained constraints
 
+**2026-10-16 budget revision:** the user explicitly changed the *remaining* experiment allowance to USD15 before any Phase4 API call. This supersedes the earlier cumulative USD20 constraint below. Cache-write-aware reconciliation raises the inherited conservative exposure from USD13.9757919 to USD14.551575125, leaving an authorized cumulative ceiling of USD29.551575125. The original ledger bytes are retained; append-only reconciliation is documented in `results/phase4/provenance/budget_revision.json`. This is a conservative estimate, not a provider invoice.
+
 The user authorizes autonomous changes to architecture, study design and samples to make the research meaningful and remove unreasonable or incorrect data. Success means evidence supports the claims, not that unknown or attack rates are forced downward. Preserve every Phase 1–3 tracked file at baseline `a666de55206ece2dcdbb669d083aa175a50dea5a`, all original corpus and all first observations. Model spending remains cumulative USD20; inherited exposure is USD13.9757919. Human independent annotation remains pending. The existing 180 bounded, redacted inputs are already authorized for API use; use those same files and limits (24000 characters,12 files), not expanded unseen source transmission.
 
 The user explicitly delegates methodological choices. We therefore record the design and review decisions and proceed without repeated design-approval questions. Work uses the dedicated research checkout on `study-v4`, never edits `sources/`, and adds versioned modules/data/results. Prior goal turn made progress by publishing Phase 3; this goal begins with current-state evidence, not an assumption that prior success closes the new objective.
@@ -36,6 +38,8 @@ Every node includes exact file/span, summary, operation, resource/status, execut
 
 ## Shared interfaces
 
+Review extensions: CONDITION edges preserve predicate association separately from DATA and ORDER. Selection rotates execution roles first, then operation/resolution strata; non-ORDER predecessor closure is prioritized over optional source-order context. Environment lookup is `environment.read` with sensitivity unknown. Command execution stores interpreter and input_source separately; exact resource binding is excluded for two original fixtures whose executable/code-source ontology was ambiguous.
+
 `evidence_v4.make_node(file, start, end, operation, resource, summary, *, execution_role, analysis_kind, resource_status='unknown', evidence=None, effect_index=0, kind='CODE_ACTION', **extra) -> dict`.
 
 `shell_v4.analyze_shell(text, file, *, line_offset=0, execution_role='source_code') -> {'nodes':list,'edges':list,'unresolved':list,'rejected':list}`. `line_offset` is zero-based displacement: snippet line1 maps to original line1+offset.
@@ -53,6 +57,10 @@ Measure false positives, missed effects, exact operation/target correctness, fal
 Original/Replay/reference fixtures must be actually run in isolated finite environments: record triggering, valid neutralization, Auth/CorePres/GoalSat, implementation_necessary and task_necessary independently. Missing reference or runtime failure cannot prove necessity. Add correct/overbroad/underbroad contracts, invalid/missing reference routes, tool errors and lease exhaustion opportunities. Record planned/reached/denied/executed effects and all-plan utility denominators.
 
 ## Completion gates and deliverables
+
+Prospective acquisition is 384 jobs:24 independent finite reasoning cases from8 families ×3 views ×2 models (144);18 nonzero-candidate real bundles ×2 hypothetical contexts ×3 views ×2 models (216);12 zero-candidate bundles ×2 source-discovery models (24). Family is the independent analysis unit; condition repetitions are not independent samples. Candidate and plan IDs are masked before transmission. Real-source discovery validates source spans only, not semantic truth. Exact request hashes and a USD5.651476575 all-jobs reservation bound are frozen before API calls.
+
+Replay refinement: manual dependency-breaking ablations remain invalid under the strict manual estimand. A separate finite target-intervention diagnostic records whether preserving the interface while removing the target artifact causes the controlled implementation to fail. This avoids defining causal validity by whether the intended causal consequence occurred. It is not a whole-program necessity proof.
 
 1. Baseline/corpus preserved; versioned source, design and all observations saved.
 2. Regression tests prove structural non-actions and argument-role bugs are corrected; independent fixture truth/provenance audited.
