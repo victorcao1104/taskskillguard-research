@@ -1,0 +1,41 @@
+{
+  "command": [
+    "docker",
+    "run",
+    "--rm",
+    "-i",
+    "--network",
+    "none",
+    "--read-only",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--pids-limit",
+    "64",
+    "--memory",
+    "256m",
+    "--cpus",
+    "1",
+    "--user",
+    "65534:65534",
+    "--tmpfs",
+    "/tmp:rw,noexec,nosuid,size=64m",
+    "--entrypoint",
+    "python3",
+    "sha256:c2b1b937174f8826eb24ce3616023c78ea50a5aa98b73fee913a13506a365244",
+    "-I",
+    "-B",
+    "-c",
+    "import json,sys,types,os\np=json.load(sys.stdin)\npkg=types.ModuleType(\"tsg\");pkg.__path__=[];sys.modules[\"tsg\"]=pkg\nfor name in (\"tsg.runtime_v6\",\"tsg.recovery_v7\"):\n source=p[\"modules\"][name]\n m=types.ModuleType(name);sys.modules[name]=m\n exec(compile(source,name+\".py\",\"exec\"),m.__dict__)\nfun=sys.modules[\"tsg.recovery_v7\"].execute\nrows=[dict(j[\"meta\"],result=fun(**j[\"args\"]),runner_status=\"completed\") for j in p[\"jobs\"]]\njson.dump({\"uid\":os.getuid(),\"rows\":rows},sys.stdout,sort_keys=True)\n"
+  ],
+  "conditions": 500,
+  "image": "sha256:c2b1b937174f8826eb24ce3616023c78ea50a5aa98b73fee913a13506a365244",
+  "jobs_sha256": "714662d0d5af4fab85065936fc00970b0d67014b16986beb1230415d8571de54",
+  "modules_sha256": {
+    "tsg.recovery_v7": "fd86e6ae88f65f2c86b8f1eac59eccb5f3fa78f194f31c8056ecbcd3c28545e6",
+    "tsg.runtime_v6": "a1568edf517b77f31f2133138987fae4d035237da1ba56c2e21529cef4b299b1"
+  },
+  "payload_sha256": "95e7b1a582d8cf3c4cb49d8bf7073dd11b502a8850edfb64c217556f65932da5",
+  "scope": "fresh in-memory state per condition, shared batch container, no host mounts"
+}
