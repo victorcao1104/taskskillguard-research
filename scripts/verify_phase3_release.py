@@ -23,6 +23,12 @@ from tsg.analysis_v3 import VARIANTS, MECHANISMS
 
 BASELINE_FILE_COUNT=10650
 BASELINE_EXPOSURE=5.8589654
+PRIMARY_EXPOSURE=13.5163768
+FOLLOWUP_SELECTION_COUNTS={'credit_balance_exhausted':173,'max_output_tokens':1}
+FOLLOWUP_FREEZE_REQUIRED={'scripts/resume_real_phase3.py','src/tsg/phase_protocol_v3.py',
+    'src/tsg/models_v3.py','src/tsg/models.py','src/tsg/real_v3.py',
+    'results/phase3_followup/manifest.json','results/phase3_followup/pending_trials.jsonl',
+    'results/phase3_followup/dry_run_summary.json'}
 
 
 def sha(path):
@@ -114,7 +120,7 @@ def verify_grid(actual,expected,fields,*,allow_partial=False):
             'complete':not errors and not missing,'errors':errors}
 
 
-def verify_budget(old_path,new_path):
+def verify_budget(old_path,new_path,*,expected_baseline=BASELINE_EXPOSURE):
     errors=[]; old_bytes=Path(old_path).read_bytes(); new_bytes=Path(new_path).read_bytes()
     if not new_bytes.startswith(old_bytes):
         errors.append('BUDGET_PREFIX_CHANGED')
@@ -127,7 +133,7 @@ def verify_budget(old_path,new_path):
             raise ValueError('INVALID_BUDGET_AMOUNT')
         return math.fsum(values)
     baseline=exposure(old); total=exposure(new)
-    if not math.isclose(baseline,BASELINE_EXPOSURE,abs_tol=1e-8,rel_tol=0):
+    if not math.isclose(baseline,expected_baseline,abs_tol=1e-8,rel_tol=0):
         errors.append('BUDGET_BASELINE_MISMATCH')
     if any(new.get(k)!=v for k,v in old.items()):
         errors.append('HISTORICAL_RESERVATION_CHANGED')
@@ -240,17 +246,20 @@ def expected_grids(root):
     return grids
 
 
-def _amendment_report(root,freeze_path):
-    provenance=freeze_path.parent; initial=provenance/'formal_freeze_initial.json'; amendment=provenance/'amendment_1.json'
+def _verify_amendment_link(root,number,record_path,before_path,after_path):
+    """Verify one immutable before/after transition rather than final-only state."""
     errors=[]
-    if not initial.exists():
-        return {'amended':False,'errors':[],'incomplete':[]}
-    if not amendment.exists():
-        return {'amended':True,'errors':[],'incomplete':['freeze_amendment_record_missing']}
-    data=load(amendment); before=load(initial); after=load(freeze_path)
-    if data.get('initial_freeze_sha256')!=sha(initial):
-        errors.append('INITIAL_FREEZE_LINK_MISMATCH')
-    if data.get('amended_freeze_sha256')!=sha(freeze_path):
+    data=load(record_path); before=load(before_path); after=load(after_path)
+    previous_key='initial_freeze_sha256' if number==1 else 'previous_freeze_sha256'
+    if data.get(previous_key)!=sha(before_path):
+        errors.append('INITIAL_FREEZE_LINK_MISMATCH' if number==1 else 'PREVIOUS_FREEZE_LINK_MISMATCH')
+    if number>1:
+        try:
+            if _safe_path(root,data.get('previous_freeze_file'))!=before_path.resolve():
+                errors.append('PREVIOUS_FREEZE_FILE_MISMATCH')
+        except ValueError:
+            errors.append('PREVIOUS_FREEZE_FILE_INVALID')
+    if data.get('amended_freeze_sha256')!=sha(after_path):
         errors.append('AMENDED_FREEZE_LINK_MISMATCH')
     changed={p for p in set(before['files_sha256'])|set(after['files_sha256'])
              if before['files_sha256'].get(p)!=after['files_sha256'].get(p)}
@@ -267,20 +276,268 @@ def _amendment_report(root,freeze_path):
             errors.append('AMENDMENT_BOUNDARY_MISSING')
     except ValueError:
         errors.append('AMENDMENT_BOUNDARY_INVALID')
-    return {'amended':True,'changed_files':sorted(changed),'errors':errors,'incomplete':[]}
+    return {'number':number,'record':record_path.relative_to(root).as_posix(),
+            'previous_freeze':before_path.relative_to(root).as_posix(),
+            'amended_freeze':after_path.relative_to(root).as_posix(),
+            'changed_files':sorted(changed),'errors':errors}
+
+
+def _amendment_report(root,freeze_path):
+    root=Path(root); freeze_path=Path(freeze_path)
+    provenance=freeze_path.parent; initial=provenance/'formal_freeze_initial.json'
+    first=provenance/'amendment_1.json'; second=provenance/'amendment_2.json'
+    intermediate=provenance/'formal_freeze_amendment_1.json'
+    if not initial.exists():
+        return {'amended':False,'amendments':[],'errors':['AMENDMENT_INITIAL_FREEZE_MISSING'] if first.exists() or second.exists() else [],'incomplete':[]}
+    if not first.exists():
+        return {'amended':True,'amendments':[],'errors':[], 'incomplete':['freeze_amendment_record_missing']}
+    if second.exists() and not intermediate.exists():
+        return {'amended':True,'amendments':[],'errors':['AMENDMENT_PREVIOUS_FREEZE_MISSING'],'incomplete':[]}
+    links=[_verify_amendment_link(root,1,first,initial,intermediate if second.exists() else freeze_path)]
+    if second.exists():
+        links.append(_verify_amendment_link(root,2,second,intermediate,freeze_path))
+    errors=[f'amendment_{link["number"]}:'+error for link in links for error in link['errors']]
+    unsupported=[p.name for p in provenance.glob('amendment_*.json')
+                 if re.fullmatch(r'amendment_\d+\.json',p.name) and p.name not in {'amendment_1.json','amendment_2.json'}]
+    errors.extend('UNSUPPORTED_AMENDMENT:'+name for name in unsupported)
+    return {'amended':True,'amendments':links,'changed_files':sorted({p for link in links for p in link['changed_files']}),
+            'errors':errors,'incomplete':[]}
 
 
 def release_required_paths(root,manifest_path):
     root=Path(root).resolve(); manifest_path=Path(manifest_path).resolve()
-    paths={p for folder in ('data/phase3','results/phase3') for p in (root/folder).rglob('*')
+    paths={p for folder in ('data/phase3','results/phase3','results/phase3_followup') for p in (root/folder).rglob('*')
            if p.is_file() and p.resolve()!=manifest_path and
-           (p.suffix!='.tmp' or (root/'results/phase3/provenance') in p.parents)}
+           (p.suffix!='.tmp' or any((root/folder/'provenance') in p.parents
+                                  for folder in ('results/phase3','results/phase3_followup')))}
     paths.update(p for folder in ('src','tests') for p in (root/folder).rglob('*v3*.py'))
     paths.update((root/'scripts').glob('*phase3*.py'))
     paths.update((root/'docs').glob('phase3*.md'))
+    paths.update(root/name for name in ('PHASE3.md','docs/reproduction_phase3.md'))
     required={p.relative_to(root).as_posix() for p in paths if p.is_file()}
     required.add('.github/workflows/phase3-tests.yml')
     return required
+
+
+def _source_manifest(root,source_hashes,required=()):
+    checked=verify_hash_manifest(root,{'files_sha256':source_hashes})
+    missing=set(required)-set(source_hashes)
+    checked['errors'].extend('SOURCE_HASH_COVERAGE_MISSING:'+name for name in sorted(missing))
+    return checked
+
+
+def verify_phase_protocol(root,*,allow_partial=False):
+    """Check saved-input linkage and exact derived conditions without replaying."""
+    root=Path(root); base=root/'results/phase3'; folder=base/'phase_protocol'
+    report={'errors':[],'incomplete':[],'grids':{}}
+    errors=report['errors']; incomplete=report['incomplete']
+    summary_path=folder/'summary.json'
+    if not summary_path.exists():
+        incomplete.append('phase_protocol/summary.json'); return report
+    summary=load(summary_path); hashes=summary.get('source_sha256',{})
+    required={'data/benchmark/synthetic_cases.jsonl','data/phase3/synthetic_cases.jsonl'}
+    pairs={'api/regression.jsonl':'api/regression.jsonl','api/new.jsonl':'api/new.jsonl',
+           'runtime/regression_full.jsonl':'runtime/regression_full.jsonl',
+           'runtime/new_full.jsonl':'runtime/new_full.jsonl','diagnostics/factorial.jsonl':'api/factorial.jsonl',
+           'diagnostics/os_contracts.jsonl':'api/os_contracts.jsonl','diagnostics/real.jsonl':'api/real.jsonl'}
+    # The final release includes real-source replay, not only the synthetic subset.
+    if summary.get('include_real') is not True:
+        incomplete.append('phase_protocol/include_real')
+    required.add('data/phase3/real_prepared.jsonl')
+    for name,source in pairs.items():
+        source_name='results/phase3/'+source; required.add(source_name)
+        original=rows(root/source_name)
+        for row in original:
+            for key in ('request_hash','p_request_hash','q_request_hash'):
+                if row.get(key): required.add('results/phase3/api/raw/'+row[key]+'.json')
+        target=folder/name
+        if not target.exists():
+            incomplete.append('phase_protocol/'+name); continue
+        actual=rows(target)
+        fields=('job_id',)
+        stable=('job_id','case_id','family_id','split','scenario','model','replicate','track',
+                'skill_id','context','variant','mixed','request_hash','p_request_hash','q_request_hash')
+        expected=[{**{k:r[k] for k in stable if k in r},'exploratory_posthoc':True} for r in original]
+        checked=verify_grid(actual,expected,fields,allow_partial=allow_partial)
+        report['grids'][name]=checked; errors.extend(name+':'+e for e in checked['errors'])
+        if checked['missing']: incomplete.append('phase_protocol/'+name)
+        for row in actual: errors.extend(verify_human_pending(row))
+    checked=_source_manifest(root,hashes,required); report['sources']=checked
+    errors.extend(checked['errors']); errors.extend(verify_human_pending(summary))
+    expected_flags={'exploratory_posthoc':True,'primary_files_modified':False,'additional_api_requests':0,
+                    'additional_api_cost_usd':0,'os_execution_replayed':False}
+    for key,value in expected_flags.items():
+        if summary.get(key)!=value: errors.append('PHASE_REPLAY_METADATA_MISMATCH:'+key)
+    if summary.get('complete') is not True: incomplete.append('phase_protocol/summary_incomplete')
+    return report
+
+
+def _followup_expected(root,primary,prepared):
+    """Independently reconstruct eligibility and allowed request change from raw failures."""
+    expected=[]; requests={}; sources=set(); errors=[]
+    for row in primary:
+        if row.get('status')!='unresolved': continue
+        fingerprint=row.get('request_hash')
+        if not isinstance(fingerprint,str) or not re.fullmatch('[0-9a-f]{64}',fingerprint):
+            errors.append('ORIGINAL_REQUEST_REFERENCE_INVALID'); continue
+        ref='results/phase3/api/raw/'+fingerprint+'.json'; sources.add(ref)
+        raw=load(_safe_path(root,ref)); response=raw.get('response') or {}
+        truncation=(raw.get('status')=='incomplete' and response.get('status')=='incomplete'
+                    and (response.get('incomplete_details') or {}).get('reason')=='max_output_tokens')
+        credit=(raw.get('status')=='api_error' and raw.get('http_status')==429
+                and raw.get('error_code')=='credit_balance_exhausted')
+        if not credit and not truncation: continue
+        request=raw['request']; cap=request['max_output_tokens']; revised={**request,'max_output_tokens':6000 if truncation else cap}
+        replicate=raw.get('replicate',0)
+        if type(replicate) is not int or replicate<0: errors.append('ORIGINAL_REPLICATE_INVALID:'+row['job_id'])
+        if truncation and cap>=6000: errors.append('TRUNCATION_CAP_NOT_INCREASED:'+row['job_id'])
+        if request.get('model')!=row['model']: errors.append('ORIGINAL_MODEL_MISMATCH:'+row['job_id'])
+        actual=hashlib.sha256(json.dumps({'request':request,'replicate':replicate},sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        if actual!=fingerprint or raw.get('request_hash')!=fingerprint: errors.append('ORIGINAL_REQUEST_HASH_MISMATCH:'+row['job_id'])
+        new_hash=hashlib.sha256(json.dumps({'request':revised,'replicate':replicate},sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        trial_id='phase3_real_followup_v1-'+hashlib.sha256((row['job_id']+':'+fingerprint).encode()).hexdigest()[:24]
+        trial={'trial_id':trial_id,'original_job_id':row['job_id'],'original_request_hash':fingerprint,
+            'original_raw_ref':ref,'original_raw_sha256':sha(root/ref),
+            **{k:row[k] for k in ('skill_id','model','context','variant')},
+            'split':prepared[row['skill_id']]['split'],
+            'selection_reason':'max_output_tokens' if truncation else 'credit_balance_exhausted',
+            'original_status':row['status'],'original_diagnostic_codes':row.get('diagnostic_codes',[]),
+            'original_max_output_tokens':cap,'max_output_tokens':revised['max_output_tokens'],
+            'adaptive_output_cap':truncation,'expected_request_hash':new_hash,
+            'new_raw_ref':'results/phase3_followup/api/raw/'+new_hash+'.json',
+            'request_change':{'max_output_tokens':[cap,6000]} if truncation else {},'replicate':replicate,
+            'trial_kind':'new_followup_sample','phase_adapter':'phase_aware_posthoc_v1'}
+        expected.append(trial); requests[trial_id]=revised
+    return expected,requests,sources,errors
+
+
+def verify_followup(root,*,allow_partial=False):
+    root=Path(root); base=root/'results/phase3_followup'; errors=[]; incomplete=[]
+    report={'errors':errors,'incomplete':incomplete}
+    needed=('manifest.json','pending_trials.jsonl','api/budget.jsonl','provenance/acquisition_freeze.json','dry_run_summary.json')
+    absent=[name for name in needed if not (base/name).exists()]
+    if absent:
+        incomplete.extend('followup/'+name for name in absent)
+        # Missing unfinished evidence cannot conceal corruption of existing frozen inputs.
+        for name,key in (('manifest.json','source_sha256'),('provenance/acquisition_freeze.json','files_sha256')):
+            if (base/name).exists():
+                checked=_source_manifest(root,load(base/name).get(key,{}))
+                errors.extend(name+':'+e for e in checked['errors'])
+        return report
+    # Read summaries and results before the growing ledger. Missing in-flight outputs are not corruption.
+    summary=load(base/'summary.json') if (base/'summary.json').exists() else None
+    completed=rows(base/'api/real.jsonl'); manifest=load(base/'manifest.json'); pending=rows(base/'pending_trials.jsonl')
+    primary=rows(root/'results/phase3/api/real.jsonl')
+    prepared={r['skill_id']:r for r in rows(root/'data/phase3/real_prepared.jsonl')}
+    expected,requests,raw_sources,selection_errors=_followup_expected(root,primary,prepared)
+    errors.extend(selection_errors)
+    counts=dict(Counter(t['selection_reason'] for t in expected))
+    report['selection_counts']=counts
+    if counts!=FOLLOWUP_SELECTION_COUNTS: errors.append('FOLLOWUP_SELECTION_COUNTS_MISMATCH')
+    if manifest.get('selection_counts')!=counts or manifest.get('planned_trials')!=len(expected):
+        errors.append('FOLLOWUP_MANIFEST_SELECTION_MISMATCH')
+    for key,value in {'primary_results_replaced':False,'automatic_retries':0,'workers':1,'budget_limit_usd':20}.items():
+        if manifest.get(key)!=value: errors.append('FOLLOWUP_MANIFEST_METADATA_MISMATCH:'+key)
+    if manifest.get('pending_trials_sha256')!=sha(base/'pending_trials.jsonl'):
+        errors.append('PENDING_TRIALS_HASH_MISMATCH')
+    selection=verify_grid(pending,expected,('trial_id',))
+    report['selection']=selection; errors.extend('selection:'+e for e in selection['errors'])
+    required=raw_sources|{'data/phase3/real_prepared.jsonl','results/phase3/api/budget.jsonl'}|{
+        'results/phase3/api/'+name+'.jsonl' for name in ('regression','new','factorial','os_contracts','real')}
+    sources=_source_manifest(root,manifest.get('source_sha256',{}),required)
+    report['sources']=sources; errors.extend(sources['errors'])
+    frozen=load(base/'provenance/acquisition_freeze.json')
+    freeze=_source_manifest(root,frozen.get('files_sha256',{}),FOLLOWUP_FREEZE_REQUIRED)
+    report['freeze']=freeze; errors.extend('freeze:'+e for e in freeze['errors'])
+    if frozen.get('cumulative_budget_limit_usd')!=20 or not math.isclose(frozen.get('historical_exposure_usd',0),PRIMARY_EXPOSURE,abs_tol=1e-8):
+        errors.append('FOLLOWUP_FREEZE_BUDGET_MISMATCH')
+    primary_budget=root/'results/phase3/api/budget.jsonl'; prefix=primary_budget.read_bytes()
+    if manifest.get('primary_budget_prefix_bytes')!=len(prefix) or manifest.get('primary_budget_sha256')!=hashlib.sha256(prefix).hexdigest():
+        errors.append('PRIMARY_BUDGET_MANIFEST_MISMATCH')
+    budget=verify_budget(primary_budget,base/'api/budget.jsonl',expected_baseline=PRIMARY_EXPOSURE)
+    report['budget']=budget; errors.extend(budget['errors'])
+    if not math.isclose(manifest.get('inherited_cumulative_cost_usd',0),PRIMARY_EXPOSURE,abs_tol=1e-8):
+        errors.append('FOLLOWUP_INHERITED_COST_MISMATCH')
+    ledger={r['reservation_id']:r for r in rows(base/'api/budget.jsonl')}
+    old_ids={r['reservation_id'] for r in rows(primary_budget)}
+    result_fields=('trial_id','original_job_id','original_request_hash','original_raw_ref','skill_id','model','context',
+                   'variant','split','trial_kind','selection_reason','adaptive_output_cap','max_output_tokens')
+    wanted=[{**{k:t[k] for k in result_fields},'job_id':t['trial_id'],'request_hash':t['expected_request_hash'],
+             'raw_ref':t['new_raw_ref']} for t in expected]
+    grid=verify_grid(completed,wanted,('trial_id',),allow_partial=allow_partial)
+    report['grid']=grid; errors.extend(grid['errors'])
+    if grid['missing']: incomplete.append('followup/api/real.jsonl')
+    by_trial={t['trial_id']:t for t in expected}; seen_reservations=set()
+    for row in completed:
+        trial=by_trial.get(row.get('trial_id'))
+        if trial is None: continue
+        checked=verify_raw_reference(row.get('request_hash'),base/'api/raw',ledger)
+        errors.extend('raw:'+e for e in checked['errors'])
+        if checked['errors']: continue
+        rid=checked['reservation_id']
+        if rid in old_ids: errors.append('PRIMARY_RESERVATION_REUSED:'+trial['trial_id'])
+        if rid in seen_reservations: errors.append('FOLLOWUP_RESERVATION_REUSED:'+trial['trial_id'])
+        seen_reservations.add(rid)
+        raw=load(root/trial['new_raw_ref'])
+        if raw.get('request')!=requests[trial['trial_id']] or raw.get('replicate')!=trial['replicate']:
+            errors.append('FOLLOWUP_REQUEST_CHANGED:'+trial['trial_id'])
+        if raw.get('tag')!=trial['trial_id']: errors.append('FOLLOWUP_RAW_TAG_MISMATCH:'+trial['trial_id'])
+        errors.extend(verify_human_pending(row))
+    allowed_raw={t['expected_request_hash'] for t in expected}
+    unexpected_raw={p.stem for p in (base/'api/raw').glob('*.json')}-allowed_raw
+    errors.extend('UNEXPECTED_FOLLOWUP_RAW:'+name for name in sorted(unexpected_raw))
+    if summary is None:
+        incomplete.append('followup/summary.json')
+    else:
+        errors.extend(verify_human_pending(summary))
+        # A summary may lag a just-written result during acquisition; it must be a correct prefix.
+        n=summary.get('completed_trials',-1)
+        if type(n) is not int or n<0 or n>len(completed): errors.append('FOLLOWUP_SUMMARY_COUNT_MISMATCH')
+        else:
+            subset=completed[:n]
+            if summary.get('status_counts')!=dict(Counter(r['status'] for r in subset)):
+                errors.append('FOLLOWUP_SUMMARY_STATUS_MISMATCH')
+            references=[{k:r[k] for k in ('trial_id','original_request_hash','request_hash','raw_ref')} for r in subset]
+            if summary.get('raw_references')!=references: errors.append('FOLLOWUP_SUMMARY_REFERENCES_MISMATCH')
+            if n!=len(expected): incomplete.append('followup/summary_incomplete')
+        if summary.get('planned_trials')!=len(expected) or summary.get('remaining_trials')!=len(expected)-n:
+            errors.append('FOLLOWUP_SUMMARY_PLANNED_MISMATCH')
+        if summary.get('primary_files_modified') is not False: errors.append('FOLLOWUP_PRIMARY_MUTATION_CLAIM')
+        for key,value in {'mode':'execute','workers':1,'automatic_retries':0,'budget_limit_usd':20}.items():
+            if summary.get(key)!=value: errors.append('FOLLOWUP_SUMMARY_METADATA_MISMATCH:'+key)
+        # Once the final result is present there can be no legitimate later call.
+        # Compare final summary totals only after its count catches up to that result.
+        if n==len(expected) and not grid['missing']:
+            total=budget['cumulative_exposure_usd']; baseline=budget['historical_exposure_usd']
+            values={'cumulative_cost_usd':total,'inherited_cumulative_cost_usd':baseline,
+                    'followup_cost_usd':total-baseline,'remaining_budget_usd':20-total}
+            for key,value in values.items():
+                if not math.isclose(summary.get(key,-1),value,abs_tol=1e-8,rel_tol=0):
+                    errors.append('FOLLOWUP_SUMMARY_COST_MISMATCH:'+key)
+            if set(ledger)-old_ids!=seen_reservations: errors.append('FOLLOWUP_UNLINKED_RESERVATIONS')
+    analysis_path=base/'analysis/summary.json'; consolidated_path=base/'analysis/consolidated_real.jsonl'
+    if not analysis_path.exists() or not consolidated_path.exists():
+        incomplete.append('followup/analysis')
+    else:
+        analysis=load(analysis_path); errors.extend(verify_human_pending(analysis))
+        checked=_source_manifest(root,analysis.get('source_sha256',{}),{
+            'results/phase3/api/real.jsonl','results/phase3/phase_protocol/diagnostics/real.jsonl',
+            'results/phase3_followup/pending_trials.jsonl','results/phase3_followup/api/real.jsonl',
+            'data/phase3/real_prepared.jsonl'})
+        errors.extend('analysis:'+e for e in checked['errors'])
+        phase={r['job_id']:r for r in rows(root/'results/phase3/phase_protocol/diagnostics/real.jsonl')}
+        replacements={r['original_job_id']:r for r in completed}; merged=[]
+        for old in primary:
+            job=old['job_id']; replacement=replacements.get(job,phase.get(job))
+            if replacement is None: errors.append('CONSOLIDATION_SOURCE_MISSING:'+job); continue
+            merged.append({**replacement,'evidence_job_id':replacement['job_id'],'job_id':job,'primary_status':old['status'],
+                           'evidence_source':'followup_new_sample' if job in replacements else 'primary_phase_reparse'})
+        checked=verify_grid(rows(consolidated_path),merged,('job_id',))
+        report['consolidation']=checked; errors.extend('consolidation:'+e for e in checked['errors'])
+        if grid['missing']: errors.append('ANALYSIS_BEFORE_FOLLOWUP_COMPLETE')
+        if analysis.get('primary_results_replaced') is not False or analysis.get('independent_prospective_evaluation') is not False:
+            errors.append('FOLLOWUP_ANALYSIS_INTERPRETATION_MISMATCH')
+    return report
 
 
 def snapshot_evidence(root,grids):
@@ -408,6 +665,9 @@ def verify_release(root,*,allow_partial=False,release_manifest=None):
             incomplete.append('analysis_summary_incomplete')
     else:
         incomplete.append('analysis_summary_missing')
+    for name,verify in (('phase_protocol',verify_phase_protocol),('followup',verify_followup)):
+        checked=verify(root,allow_partial=allow_partial); report[name]=checked
+        errors.extend(name+':'+e for e in checked['errors']); incomplete.extend(checked['incomplete'])
     manifest_path=Path(release_manifest) if release_manifest else base/'provenance/release_manifest.json'
     if not manifest_path.is_absolute():
         manifest_path=root/manifest_path

@@ -157,3 +157,200 @@ def test_partial_snapshot_reads_ledger_after_checkpoint_growth(tmp_path,monkeypa
     snapshot=module.snapshot_evidence(tmp_path,{'api/real.jsonl':{}})
     assert 'new' in snapshot['ledger']
     assert snapshot['budget']['cumulative_exposure_usd']==pytest.approx(6.3589654)
+
+
+def test_second_amendment_verifies_first_against_preserved_intermediate_freeze(tmp_path):
+    module=api(); folder=tmp_path/'results/phase3/provenance'; folder.mkdir(parents=True)
+    initial={'code_commit':'initial','files_sha256':{'src/tsg/real_v3.py':'a'*64,'other.py':'1'*64}}
+    first={'code_commit':'first','files_sha256':{'src/tsg/real_v3.py':'a'*64,'other.py':'2'*64}}
+    final={'code_commit':'second','files_sha256':{'src/tsg/real_v3.py':'b'*64,'other.py':'2'*64}}
+    def write(name,value):
+        path=folder/name; path.write_text(json.dumps(value)); return path
+    initial_path=write('formal_freeze_initial.json',initial)
+    first_path=write('formal_freeze_amendment_1.json',first)
+    final_path=write('formal_freeze.json',final)
+    boundary=write('boundary.json',{'acquisition_complete':True})
+    common={'reasons':['Offline portability correction.'],'acquisition_boundary':boundary.relative_to(tmp_path).as_posix()}
+    write('amendment_1.json',{**common,'initial_freeze_sha256':module.sha(initial_path),
+          'amended_freeze_sha256':module.sha(first_path),'code_commit':'first','changed_files':['other.py']})
+    write('amendment_2.json',{**common,'previous_freeze_file':first_path.relative_to(tmp_path).as_posix(),
+          'previous_freeze_sha256':module.sha(first_path),'amended_freeze_sha256':module.sha(final_path),
+          'code_commit':'second','changed_files':['src/tsg/real_v3.py']})
+    result=module._amendment_report(tmp_path,final_path)
+    assert result['errors']==[] and result['incomplete']==[]
+    assert [a['number'] for a in result['amendments']]==[1,2]
+    first_path.write_text(json.dumps({**first,'code_commit':'tampered'}))
+    assert module._amendment_report(tmp_path,final_path)['errors']
+
+
+def test_second_amendment_cannot_replace_or_skip_the_first_record(tmp_path):
+    module=api(); folder=tmp_path/'results/phase3/provenance'; folder.mkdir(parents=True)
+    for name in ('formal_freeze_initial.json','formal_freeze.json'):
+        (folder/name).write_text(json.dumps({'code_commit':'c','files_sha256':{}}))
+    (folder/'amendment_2.json').write_text(json.dumps({'previous_freeze_file':'../outside.json'}))
+    result=module._amendment_report(tmp_path,folder/'formal_freeze.json')
+    assert result['errors'] or result['incomplete']
+
+
+def test_release_coverage_includes_followup_and_reproduction_entrypoints(tmp_path):
+    names=('PHASE3.md','docs/reproduction_phase3.md','results/phase3_followup/manifest.json',
+           'results/phase3_followup/api/raw/response.json','results/phase3_followup/analysis/summary.json')
+    for name in names:
+        path=tmp_path/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_text('{}')
+    required=api().release_required_paths(tmp_path,tmp_path/'release_manifest.json')
+    assert set(names)<=required
+
+
+def test_budget_can_verify_primary_acquisition_prefix_without_reusing_old_baseline(tmp_path):
+    primary=tmp_path/'primary'; followup=tmp_path/'followup'
+    primary.write_text('{"reservation_id":"p","reserved_usd":13.5163768}\n')
+    followup.write_bytes(primary.read_bytes()+b'{"reservation_id":"f","reserved_usd":0.5}\n')
+    result=api().verify_budget(primary,followup,expected_baseline=13.5163768)
+    assert result['errors']==[] and result['incremental_exposure_usd']==pytest.approx(.5)
+    followup.write_bytes(followup.read_bytes()+b'{"reservation_id":"p","reserved_usd":0}\n')
+    assert 'HISTORICAL_RESERVATION_CHANGED' in api().verify_budget(primary,followup,expected_baseline=13.5163768)['errors']
+
+
+def followup_fixture(root,module):
+    def put(name,value,jsonl=False):
+        path=root/name; path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text((''.join(json.dumps(r)+'\n' for r in value) if jsonl else json.dumps(value)),encoding='utf-8')
+        return path
+    primary=[]; pending=[]
+    for i,reason in enumerate(('credit_balance_exhausted','max_output_tokens')):
+        request={'model':'gpt-6-luna','input':[{'role':'developer','content':'system'},{'role':'user','content':str(i)}],
+                 'max_output_tokens':3000,'text':{'format':{'type':'json_schema','schema':{'type':'object'}}}}
+        fingerprint=digest(json.dumps({'request':request,'replicate':0},sort_keys=True,ensure_ascii=False).encode())
+        raw={'request':request,'replicate':0,'request_hash':fingerprint,'reservation_id':'old'+str(i),
+             'status':'api_error' if i==0 else 'incomplete','http_status':429,'error_code':reason,
+             'response':{'status':'incomplete','incomplete_details':{'reason':'max_output_tokens'}} if i else None}
+        oldref='results/phase3/api/raw/'+fingerprint+'.json'; rawpath=put(oldref,raw)
+        job='job-'+str(i); trial_id='phase3_real_followup_v1-'+digest((job+':'+fingerprint).encode())[:24]
+        revised={**request,'max_output_tokens':6000 if i else 3000}
+        newhash=digest(json.dumps({'request':revised,'replicate':0},sort_keys=True,ensure_ascii=False).encode())
+        primary.append({'job_id':job,'skill_id':'s','model':'gpt-6-luna','context':'edge','variant':'raw',
+                        'status':'unresolved','request_hash':fingerprint,'diagnostic_codes':['API_ERROR']})
+        pending.append({'trial_id':trial_id,'original_job_id':job,'original_request_hash':fingerprint,
+            'original_raw_ref':oldref,'original_raw_sha256':module.sha(rawpath),'skill_id':'s','model':'gpt-6-luna',
+            'context':'edge','variant':'raw','split':'held_out_test','selection_reason':reason,
+            'original_status':'unresolved','original_diagnostic_codes':['API_ERROR'],
+            'original_max_output_tokens':3000,'max_output_tokens':6000 if i else 3000,'adaptive_output_cap':bool(i),
+            'expected_request_hash':newhash,'new_raw_ref':'results/phase3_followup/api/raw/'+newhash+'.json',
+            'request_change':{'max_output_tokens':[3000,6000]} if i else {},'replicate':0,
+            'trial_kind':'new_followup_sample','phase_adapter':'phase_aware_posthoc_v1'})
+    put('results/phase3/api/real.jsonl',primary,True)
+    put('data/phase3/real_prepared.jsonl',[{'skill_id':'s','split':'held_out_test'}],True)
+    put('results/phase3/api/budget.jsonl',[{'reservation_id':'old'+str(i),'model':'gpt-6-luna',
+                                         'status':'unknown_usage','reserved_usd':13.5163768/2} for i in range(2)],True)
+    for name in ('regression','new','factorial','os_contracts'):
+        put('results/phase3/api/'+name+'.jsonl',[],True)
+    base=root/'results/phase3_followup'; trialpath=put('results/phase3_followup/pending_trials.jsonl',pending,True)
+    prefix=(root/'results/phase3/api/budget.jsonl').read_bytes()
+    sources={p.relative_to(root).as_posix():module.sha(p) for p in (root/'results/phase3/api').rglob('*') if p.is_file()}
+    sources['data/phase3/real_prepared.jsonl']=module.sha(root/'data/phase3/real_prepared.jsonl')
+    manifest={'version':'phase3_real_followup_v1','planned_trials':2,'selection_counts':{'credit_balance_exhausted':1,'max_output_tokens':1},
+              'primary_results_replaced':False,'automatic_retries':0,'workers':1,'budget_limit_usd':20,
+              'source_sha256':sources,'pending_trials_sha256':module.sha(trialpath),
+              'primary_budget_prefix_bytes':len(prefix),'primary_budget_sha256':digest(prefix),
+              'inherited_cumulative_cost_usd':13.5163768}
+    put('results/phase3_followup/manifest.json',manifest)
+    put('results/phase3_followup/dry_run_summary.json',{'mode':'dry_run','api_calls_this_run':0})
+    (base/'api').mkdir(); (base/'api/budget.jsonl').write_bytes(prefix)
+    freeze_names=list(module.FOLLOWUP_FREEZE_REQUIRED)
+    for name in freeze_names:
+        if not (root/name).exists(): put(name,{})
+    put('results/phase3_followup/provenance/acquisition_freeze.json',{'files_sha256':{
+        name:module.sha(root/name) for name in freeze_names},'cumulative_budget_limit_usd':20,
+        'historical_exposure_usd':13.5163768})
+    return primary,pending,put
+
+
+def test_fup_partial(tmp_path,monkeypatch):
+    module=api(); monkeypatch.setattr(module,'FOLLOWUP_SELECTION_COUNTS',{'credit_balance_exhausted':1,'max_output_tokens':1})
+    primary,pending,put=followup_fixture(tmp_path,module)
+    report=module.verify_followup(tmp_path,allow_partial=True)
+    assert report['errors']==[] and report['grid']['missing']==2 and report['incomplete']
+    trialfile=tmp_path/'results/phase3_followup/pending_trials.jsonl'
+    altered=[{**pending[0],'max_output_tokens':6000},pending[1]]; put(trialfile.relative_to(tmp_path),altered,True)
+    report=module.verify_followup(tmp_path,allow_partial=True)
+    assert any('PENDING_TRIALS_HASH_MISMATCH' in e for e in report['errors'])
+    assert any('METADATA_MISMATCH' in e for e in report['errors'])
+
+
+def test_fup_raw(tmp_path,monkeypatch):
+    module=api(); monkeypatch.setattr(module,'FOLLOWUP_SELECTION_COUNTS',{'credit_balance_exhausted':1,'max_output_tokens':1})
+    primary,pending,put=followup_fixture(tmp_path,module); trial=pending[0]
+    raw=json.loads((tmp_path/trial['original_raw_ref']).read_text()); raw['tag']=trial['trial_id']
+    put(trial['new_raw_ref'],raw)
+    result={k:trial[k] for k in ('trial_id','original_job_id','original_request_hash','original_raw_ref',
+            'skill_id','model','context','variant','split','trial_kind','selection_reason','adaptive_output_cap','max_output_tokens')}
+    result.update(job_id=trial['trial_id'],request_hash=trial['expected_request_hash'],raw_ref=trial['new_raw_ref'],status='unresolved')
+    put('results/phase3_followup/api/real.jsonl',[result],True)
+    report=module.verify_followup(tmp_path,allow_partial=True)
+    assert any('PRIMARY_RESERVATION_REUSED' in e for e in report['errors'])
+
+
+def test_phase_replay_checks_hashes_and_requires_all_derived_files(tmp_path):
+    module=api(); source=tmp_path/'results/phase3/api/real.jsonl'; source.parent.mkdir(parents=True)
+    row={'job_id':'j','skill_id':'s','model':'m','context':'edge','variant':'raw','request_hash':None,
+         'model_evaluated':False,'empty_candidate_set':True,'status':'not_applicable'}
+    source.write_text(json.dumps(row)+'\n')
+    folder=tmp_path/'results/phase3/phase_protocol'; folder.mkdir()
+    summary={'source_sha256':{'results/phase3/api/real.jsonl':module.sha(source)},'include_real':True,
+             'complete':True,'exploratory_posthoc':True,'primary_files_modified':False,
+             'additional_api_requests':0,'additional_api_cost_usd':0,'os_execution_replayed':False}
+    (folder/'summary.json').write_text(json.dumps(summary))
+    result=module.verify_phase_protocol(tmp_path,allow_partial=True)
+    assert 'phase_protocol/diagnostics/real.jsonl' in result['incomplete']
+    source.write_text('{}\n')
+    assert any('HASH_MISMATCH' in e for e in module.verify_phase_protocol(tmp_path,allow_partial=True)['errors'])
+
+
+def completed_followup_fixture(root,module):
+    primary,pending,put=followup_fixture(root,module); completed=[]
+    ledger=root/'results/phase3_followup/api/budget.jsonl'
+    for i,trial in enumerate(pending):
+        raw=json.loads((root/trial['original_raw_ref']).read_text())
+        raw.update(tag=trial['trial_id'],reservation_id='new'+str(i),request_hash=trial['expected_request_hash'])
+        raw['request']['max_output_tokens']=trial['max_output_tokens']
+        put(trial['new_raw_ref'],raw)
+        with ledger.open('a') as stream:
+            stream.write(json.dumps({'reservation_id':'new'+str(i),'model':'gpt-6-luna','status':'settled','reserved_usd':.1,'cost_usd':.1})+'\n')
+        row={k:trial[k] for k in ('trial_id','original_job_id','original_request_hash','original_raw_ref',
+            'skill_id','model','context','variant','split','trial_kind','selection_reason','adaptive_output_cap','max_output_tokens')}
+        row.update(job_id=trial['trial_id'],request_hash=trial['expected_request_hash'],raw_ref=trial['new_raw_ref'],
+                   status='valid' if i==0 else 'unresolved')
+        completed.append(row)
+    put('results/phase3_followup/api/real.jsonl',completed,True)
+    summary={'mode':'execute','planned_trials':2,'completed_trials':2,'remaining_trials':0,'status_counts':{'valid':1,'unresolved':1},
+             'workers':1,'automatic_retries':0,'budget_limit_usd':20,'primary_files_modified':False,
+             'cumulative_cost_usd':13.7163768,'inherited_cumulative_cost_usd':13.5163768,'followup_cost_usd':.2,
+             'remaining_budget_usd':6.2836232,
+             'raw_references':[{k:r[k] for k in ('trial_id','original_request_hash','request_hash','raw_ref')} for r in completed]}
+    put('results/phase3_followup/summary.json',summary)
+    put('results/phase3/phase_protocol/diagnostics/real.jsonl',primary,True)
+    names=('results/phase3/api/real.jsonl','results/phase3/phase_protocol/diagnostics/real.jsonl',
+           'results/phase3_followup/pending_trials.jsonl','results/phase3_followup/api/real.jsonl','data/phase3/real_prepared.jsonl')
+    put('results/phase3_followup/analysis/summary.json',{'primary_results_replaced':False,
+        'independent_prospective_evaluation':False,'human_accuracy':None,'source_sha256':{n:module.sha(root/n) for n in names}})
+    merged=[{**row,'evidence_job_id':row['job_id'],'job_id':row['original_job_id'],
+             'primary_status':'unresolved','evidence_source':'followup_new_sample'} for row in completed]
+    put('results/phase3_followup/analysis/consolidated_real.jsonl',merged,True)
+    return summary,merged,put
+
+
+def test_fup_final(tmp_path,monkeypatch):
+    module=api(); monkeypatch.setattr(module,'FOLLOWUP_SELECTION_COUNTS',{'credit_balance_exhausted':1,'max_output_tokens':1})
+    summary,merged,put=completed_followup_fixture(tmp_path,module)
+    result=module.verify_followup(tmp_path)
+    assert result['errors']==[] and result['incomplete']==[]
+    merged[1]['status']='valid'
+    put('results/phase3_followup/analysis/consolidated_real.jsonl',merged,True)
+    assert any('consolidation:METADATA_MISMATCH' in e for e in module.verify_followup(tmp_path)['errors'])
+
+
+def test_fup_cost(tmp_path,monkeypatch):
+    module=api(); monkeypatch.setattr(module,'FOLLOWUP_SELECTION_COUNTS',{'credit_balance_exhausted':1,'max_output_tokens':1})
+    summary,merged,put=completed_followup_fixture(tmp_path,module)
+    put('results/phase3_followup/summary.json',{**summary,'cumulative_cost_usd':0})
+    assert 'FOLLOWUP_SUMMARY_COST_MISMATCH:cumulative_cost_usd' in module.verify_followup(tmp_path)['errors']
