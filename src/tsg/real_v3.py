@@ -51,7 +51,7 @@ def _verified_paths(row):
     paths = {}
     # Resolve every path before reading any file, including the primary SKILL.
     for relative in row['file_sha256']:
-        path = (root / relative).resolve()
+        path = (root / relative.replace('\\', '/')).resolve()
         if not path.is_relative_to(root):
             raise ValueError('MANIFEST_PATH_OUTSIDE_BUNDLE')
         paths[relative] = path
@@ -169,7 +169,10 @@ def prepare_row(row):
         raise ValueError('SOURCE_NOT_COMPLETED')
     paths = _verified_paths(row)
     _check_source_hashes(paths, row['file_sha256'])
-    files, coverage = read_bundle(row, max_chars=LIMITS['max_chars_per_bundle'],
+    # Normalize lookup separators only; retain the frozen manifest in provenance.
+    lookup_row = {**row, 'file_sha256': {name.replace('\\', '/'): digest
+                                       for name, digest in row['file_sha256'].items()}}
+    files, coverage = read_bundle(lookup_row, max_chars=LIMITS['max_chars_per_bundle'],
                                   max_files=LIMITS['max_files_per_bundle'])
     full = extract_graph_v2(row['skill_id'], files)
     graph, actions, graph_coverage = _bounded_graph(full)
