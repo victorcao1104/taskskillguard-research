@@ -96,7 +96,22 @@ def verify(root=ROOT, *, require_release_hashes=True):
     if len(omission_bytes.splitlines())!=2447: raise ValueError('OMISSION_MANIFEST_MISMATCH')
     if (packet/'omitted_files.jsonl').exists() and (packet/'omitted_files.jsonl').read_bytes()!=omission_bytes:
         raise ValueError('OMISSION_LOCAL_BYTES_MISMATCH')
-    hashes=root/'results/phase5/provenance/release_hashes.json'
+    provenance=root/'results/phase5/provenance'
+    amendment=provenance/'ci_portability_amendment.json'
+    amended=False
+    if amendment.exists():
+        audit=_read(amendment); old_hashes=_read(provenance/'release_hashes.json')['files']
+        for path, old_hash in old_hashes.items():
+            if path in audit['changed_files']:
+                change=audit['changed_files'][path]
+                if old_hash!=change['before_sha256'] or sha((root/change['preserved_at']).read_bytes())!=old_hash:
+                    raise ValueError('AMENDMENT_ORIGINAL_SOURCE_MISMATCH:'+path)
+                if sha((root/path).read_bytes())!=change['after_sha256']:
+                    raise ValueError('AMENDMENT_CURRENT_SOURCE_MISMATCH:'+path)
+            elif sha((root/path).read_bytes())!=old_hash:
+                raise ValueError('UNDECLARED_PHASE5_RELEASE_CHANGE:'+path)
+        amended=True
+    hashes=provenance/('release_hashes_v2.json' if amended else 'release_hashes.json')
     checked_new=0
     if hashes.exists():
         for path,h in _read(hashes)['files'].items():
@@ -110,11 +125,13 @@ def verify(root=ROOT, *, require_release_hashes=True):
             'followup_unique_request_hashes':len({j['expected_request_hash'] for j in follow_jobs}),
             'recovery_records_rehashed_rescored':180,
             'human_items_per_rater':832,'human_labels':0,'cumulative_upper_usd':budget.total_cost,
-            'cap_usd':CAP,'remaining_usd':CAP-budget.total_cost,'verified':True}
+            'cap_usd':CAP,'remaining_usd':CAP-budget.total_cost,
+            'portability_amendment_verified':amended,'verified':True}
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(); parser.add_argument('--pre-release',action='store_true')
     parser.add_argument('--save',action='store_true'); args=parser.parse_args()
     report=verify(require_release_hashes=not args.pre_release)
-    if args.save: immutable(ROOT/'results/phase5/provenance/release_verification.json',json_bytes(report))
+    output_name='release_verification_v2.json' if report['portability_amendment_verified'] else 'release_verification.json'
+    if args.save: immutable(ROOT/'results/phase5/provenance'/output_name,json_bytes(report))
     print(json.dumps(report),flush=True)

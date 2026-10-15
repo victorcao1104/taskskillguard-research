@@ -43,7 +43,9 @@ def build_cases():
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_STORED) as z:
         for name, body in [('notes.txt', 'abc'), ('nested/data.csv', 'a,b\n1,2\n')]:
-            z.writestr(zipfile.ZipInfo(name, (2020, 1, 1, 0, 0, 0)), body)
+            info = zipfile.ZipInfo(name, (2020, 1, 1, 0, 0, 0))
+            info.create_system = 0  # Frozen Windows-produced input; stable on every host.
+            z.writestr(info, body)
     specifications = [
         ('filter_redact', 'Keep active people; output id and name only, preserving order.',
          '[{"id":1,"name":"Ada","email":"ada@example.invalid","active":true},{"id":2,"name":"Bo","email":"bo@example.invalid","active":false},{"id":3,"name":"Cy","email":"cy@example.invalid","active":true}]',

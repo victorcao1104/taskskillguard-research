@@ -9,6 +9,7 @@
 - [独立审查](docs/phase5_review.md)、[修订链](docs/phase5_amendments.md)、[复现说明](docs/phase5_reproduction.md)
 - [人工标注交接](data/phase5/human_review/README.md)：每名标注员 832 条空白记录；真实语料准确率尚未知。
 - [保存证据验证](results/phase5/provenance/release_verification.json)
+- [跨平台发布修正](docs/phase5_ci_portability.md)、[修正后完整验证](results/phase5/provenance/release_verification_v2.json)：固定 ZIP 创建系统元数据，原实验与首版源码均保留。
 
 结果摘要：新家族效果召回 7/61→53/61，首次留出 6/10；真实 180 份 Skill 仅新增两个候选，128 份仍零候选；图边无跨模型稳定增益；隔离故障实验的授权内成功从仅拦截 0/48 提升为合法恢复 40/48。
 

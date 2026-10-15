@@ -16,6 +16,22 @@ def module():
         pytest.fail('Integrated phase-five recovery is not implemented yet')
 
 
+@pytest.mark.parametrize('host_system', [0, 3])
+def test_archive_fixture_bytes_do_not_depend_on_host_zip_metadata(monkeypatch, host_system):
+    m = module()
+    original = m.zipfile.ZipInfo
+
+    class HostZipInfo(original):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.create_system = host_system
+
+    monkeypatch.setattr(m.zipfile, 'ZipInfo', HostZipInfo)
+    frozen = [json.loads(line) for line in
+              (Path(__file__).resolve().parents[1] / 'data/phase5/recovery_cases.jsonl').read_text(encoding='utf-8').splitlines()]
+    assert m.build_cases() == frozen
+
+
 def job(condition='normal', mode='guard_recovery', family=None):
     return next(j for j in module().build_grid() if j['condition'] == condition
                 and j['mode'] == mode and (family is None or j['case']['case_id'] == family))
