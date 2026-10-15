@@ -1,0 +1,16 @@
+name: Phase four evidence checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  phase4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r configs/requirements-lock.txt
+      - run: python -m pytest -q --basetemp work/phase4-ci-tests
+      - name: Verify frozen evidence and all new file hashes
+        run: python scripts/verify_phase4_release.py --hash-manifest results/phase4/provenance/release_hashes.json

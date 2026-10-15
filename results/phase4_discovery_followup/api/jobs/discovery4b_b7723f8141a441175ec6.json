@@ -1,0 +1,211 @@
+{
+  "case_id": "real-a9c944bdb8bd121b",
+  "context": "nonexecuting_candidate_discovery_protocol_repair",
+  "elapsed_seconds": 4.305489100006525,
+  "family": "family-837b47fba8872a47",
+  "job_id": "discovery4b_b7723f8141a441175ec6",
+  "model": "gpt-6-luna",
+  "original_job_id": "discovery-real-a9c944bdb8bd121b-gpt-6-luna",
+  "parsed": {
+    "actions": [
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0037",
+        "excerpt": "Before any paid MCP call, call `identity_balance({verbose: true})` once. Surface the current balance, recent burn rate, and remaining runway, then gate the run with this exact message:\n\n> Estimated cost: about 4,000 credits (~$40) for a typical Seedance UGC ad with fallback/retry budget. This exceeds $5, so Reply `proceed` to continue or `cancel` to stop.\n\nDo not call any paid MCP tool until the user replies `proceed`. If the user replies `cancel`, stop without generating. The gate runs after the product URL is known and before avatar analysis, screenshot capture, video generation, captions, or paid retries.",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_8a70f1d6d7bfabccfc9bae7c",
+        "invocation_proven": false,
+        "line_end": 37,
+        "line_start": 33,
+        "operation": "unknown",
+        "reason": "Directs paid MCP tool calls after a user proceeds; specific tools and targets are not identified in this span.",
+        "resource": "paid MCP tools",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0033"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0047",
+        "excerpt": "- Step 1 (WebFetch) + Step 3 (capture_website screenshot): ~10–30s\n- Step 7 (`generate_reference_video`): ~3–5 min for seedance, ~5–7 min for kling\n- Step 7b/c (cartoonize + retry): adds ~1–2 min if seedance moderation rejects the avatar\n- Step 8 (deterministic brand/spec overlays): 1-2 `edit_text_overlay` calls, ~30s–5 min total\n- Step 9 (captions): single `add_captions` call, ~30s–5 min (transcribe + burn in one shot)",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_a2362d25aeb870068798a093",
+        "invocation_proven": false,
+        "line_end": 47,
+        "line_start": 43,
+        "operation": "unknown",
+        "reason": "Names generation, screenshot, overlay, and caption tools, but does not specify their concrete resource targets or network/file semantics.",
+        "resource": "MCP tools",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0043"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0071",
+        "excerpt": "When any long-running generation or edit call returns a `task_id` with or without an initial status, including `{task_id}`, `{task_id, status: \"queued\"}`, or an initial `queued`, `running`, or `processing` status, record the task id and start time immediately.\n\n- Call `task_status({task_id})` in a tight loop until terminal (`completed | failed | cancelled`). No manual sleep and no Bash polling; the worker holds each status call open.\n- Emit ONE visible progress line every 60s while status is `queued`, `running`, or `processing`: `Seedance i2v queued for {N}m {S}s... still processing`. Replace the provider/stage label when polling Kling, GPT-image-2, caption, or edit tasks.\n- On `completed`, unwrap the returned result URL and continue.\n- On `failed` or `cancelled`, surface failure to the user with `task_id`, status, and the last status message.\n- After 15 min total from the original submit, call `task_cancel({task_id})` if the task is still non-terminal, then surface failure to the user. If cancel reports the task is already terminal, call status once more and report that terminal result.",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_4189c4c0c7f9d288a0f9e953",
+        "invocation_proven": false,
+        "line_end": 71,
+        "line_start": 65,
+        "operation": "unknown",
+        "reason": "Directs polling a task and cancelling it after 15 minutes; task_cancel is an external tool action with target task_id, but protocol semantics are unspecified.",
+        "resource": "task_id",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0065"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0095",
+        "excerpt": "`WebFetch` the URL: pull `product_name`, `brand_name`, value prop, brand color, product form, packaging, hero copy, target user, category, **and the primary language of the page**. Use `category=` if passed; else trust the WebFetch signal; fall back to HAUL for physical, APP for digital.",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_4c7f7588f9396d9c5a6432a9",
+        "invocation_proven": false,
+        "line_end": 95,
+        "line_start": 95,
+        "operation": "network.get",
+        "reason": "Instructs WebFetch of the supplied product URL to retrieve page content; actual invocation is not established.",
+        "resource": "product URL",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0095"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0132",
+        "excerpt": "Call `analyze_media` once:\n\n```\nquery: \"Classify this image for paid video generation. Is it a photograph of a real human face, an AI-generated realistic portrait, a stylized / illustrated character, or a recognizable trademarked / copyrighted character such as Batman, Pikachu, or Mickey Mouse? Return strict JSON only: { \\\"avatar_type\\\": \\\"real_human\\\" | \\\"ai_realistic\\\" | \\\"stylized_illustrated\\\" | \\\"recognized_ip\\\", \\\"recognized_character\\\": string | null, \\\"moderation_risk\\\": \\\"low\\\" | \\\"medium\\\" | \\\"high\\\", \\\"recommendation\\\": \\\"proceed\\\" | \\\"warn\\\" | \\\"reject\\\" }. Use null for `recognized_character` when no specific character is recognized; never write \\\"none\\\", \\\"unknown\\\", or explanatory prose in that field.\"",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_913dff13b6be229ac10d94da",
+        "invocation_proven": false,
+        "line_end": 132,
+        "line_start": 129,
+        "operation": "unknown",
+        "reason": "Directs calling analyze_media on an image to classify it; tool semantics and concrete image target depend on the avatar selected at runtime.",
+        "resource": "avatar image",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0129"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0147",
+        "excerpt": "Call `capture_website` with `mode: \"screenshot\"`. Use `mobile=true` for handheld-product categories (APP / FITNESS / BEAUTY) so the captured page renders as a portrait phone screen; `mobile=false` for desktop-context categories (HAUL / TECH / FOOD).\n\nIf the call fails (timeout, browser pool down), retry **once**. If still failing, proceed without the screenshot — the skill is degraded but functional. The close-up beat then describes the page from prose only and Beat 2's `reference_images` is just `[avatar_url]`.\n\nCapture URL → `screenshot_url` (or null).",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_ec33cdc5163ac56e7d16d826",
+        "invocation_proven": false,
+        "line_end": 147,
+        "line_start": 143,
+        "operation": "unknown",
+        "reason": "Directs capture_website in screenshot mode for the product URL; the tool's underlying access semantics are not specified.",
+        "resource": "product URL",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0143"
+      }
+    ],
+    "analysis_registration": "posthoc_protocol_repair_exploratory",
+    "anchoring_by_construction": true,
+    "coverage_complete": false,
+    "diagnostic_codes": [],
+    "exploratory_posthoc": true,
+    "human_annotated": false,
+    "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+    "original_diagnostic_codes": [],
+    "original_protocol_valid": true,
+    "phase_selection": {
+      "adapter_version": "phase_aware_posthoc_v1",
+      "commentary_count": 0,
+      "discarded_commentary_indices": [],
+      "exploratory_posthoc": true,
+      "final_answer_count": 1,
+      "message_count": 1,
+      "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+      "selected_output_index": 0,
+      "selection_mode": "explicit_final_answer"
+    },
+    "prediction": {
+      "actions": [
+        {
+          "end_id": "F0:L0037",
+          "execution_role": "instruction",
+          "operation": "unknown",
+          "reason": "Directs paid MCP tool calls after a user proceeds; specific tools and targets are not identified in this span.",
+          "resource": "paid MCP tools",
+          "start_id": "F0:L0033"
+        },
+        {
+          "end_id": "F0:L0047",
+          "execution_role": "instruction",
+          "operation": "unknown",
+          "reason": "Names generation, screenshot, overlay, and caption tools, but does not specify their concrete resource targets or network/file semantics.",
+          "resource": "MCP tools",
+          "start_id": "F0:L0043"
+        },
+        {
+          "end_id": "F0:L0071",
+          "execution_role": "instruction",
+          "operation": "unknown",
+          "reason": "Directs polling a task and cancelling it after 15 minutes; task_cancel is an external tool action with target task_id, but protocol semantics are unspecified.",
+          "resource": "task_id",
+          "start_id": "F0:L0065"
+        },
+        {
+          "end_id": "F0:L0095",
+          "execution_role": "instruction",
+          "operation": "network.get",
+          "reason": "Instructs WebFetch of the supplied product URL to retrieve page content; actual invocation is not established.",
+          "resource": "product URL",
+          "start_id": "F0:L0095"
+        },
+        {
+          "end_id": "F0:L0132",
+          "execution_role": "instruction",
+          "operation": "unknown",
+          "reason": "Directs calling analyze_media on an image to classify it; tool semantics and concrete image target depend on the avatar selected at runtime.",
+          "resource": "avatar image",
+          "start_id": "F0:L0129"
+        },
+        {
+          "end_id": "F0:L0147",
+          "execution_role": "instruction",
+          "operation": "unknown",
+          "reason": "Directs capture_website in screenshot mode for the product URL; the tool's underlying access semantics are not specified.",
+          "resource": "product URL",
+          "start_id": "F0:L0143"
+        }
+      ]
+    },
+    "protocol_valid": true,
+    "protocol_version": "phase4-discovery-line-id-v1",
+    "repairs_protocol": "phase4-discovery-v1",
+    "schema_errors": [],
+    "semantic_validity": "unverified",
+    "source_anchored": true,
+    "source_executed": false,
+    "source_sha256": {
+      "SKILL.md": "f7678a790f64b690bd959bebec0030f28b699c0bc72031c9bd54b2158ccd521d"
+    },
+    "text": "{\"actions\":[{\"end_id\":\"F0:L0037\",\"execution_role\":\"instruction\",\"operation\":\"unknown\",\"reason\":\"Directs paid MCP tool calls after a user proceeds; specific tools and targets are not identified in this span.\",\"resource\":\"paid MCP tools\",\"start_id\":\"F0:L0033\"},{\"end_id\":\"F0:L0047\",\"execution_role\":\"instruction\",\"operation\":\"unknown\",\"reason\":\"Names generation, screenshot, overlay, and caption tools, but does not specify their concrete resource targets or network/file semantics.\",\"resource\":\"MCP tools\",\"start_id\":\"F0:L0043\"},{\"end_id\":\"F0:L0071\",\"execution_role\":\"instruction\",\"operation\":\"unknown\",\"reason\":\"Directs polling a task and cancelling it after 15 minutes; task_cancel is an external tool action with target task_id, but protocol semantics are unspecified.\",\"resource\":\"task_id\",\"start_id\":\"F0:L0065\"},{\"end_id\":\"F0:L0095\",\"execution_role\":\"instruction\",\"operation\":\"network.get\",\"reason\":\"Instructs WebFetch of the supplied product URL to retrieve page content; actual invocation is not established.\",\"resource\":\"product URL\",\"start_id\":\"F0:L0095\"},{\"end_id\":\"F0:L0132\",\"execution_role\":\"instruction\",\"operation\":\"unknown\",\"reason\":\"Directs calling analyze_media on an image to classify it; tool semantics and concrete image target depend on the avatar selected at runtime.\",\"resource\":\"avatar image\",\"start_id\":\"F0:L0129\"},{\"end_id\":\"F0:L0147\",\"execution_role\":\"instruction\",\"operation\":\"unknown\",\"reason\":\"Directs capture_website in screenshot mode for the product URL; the tool's underlying access semantics are not specified.\",\"resource\":\"product URL\",\"start_id\":\"F0:L0143\"}]}"
+  },
+  "raw_ref": "results/phase4_discovery_followup/api/raw/fcb093f940bea355aa55d7522e69bd6d33e38ea865c24896357b2e5300921673.json",
+  "raw_status": "completed",
+  "request_hash": "fcb093f940bea355aa55d7522e69bd6d33e38ea865c24896357b2e5300921673",
+  "source_id": "s_6740908c2338f4c4",
+  "split": "development",
+  "track": "discovery_followup",
+  "usage": {
+    "input_tokens": 11848,
+    "input_tokens_details": {
+      "cache_write_tokens": 11845,
+      "cached_tokens": 0
+    },
+    "output_tokens": 370,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 12218
+  },
+  "view": "line_ids"
+}

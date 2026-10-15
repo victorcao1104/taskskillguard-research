@@ -1,0 +1,129 @@
+{
+  "case_id": "real-21c70139721efc2d",
+  "context": "nonexecuting_candidate_discovery",
+  "elapsed_seconds": 12.60007040000346,
+  "family": "family-93bf1e1c5c6c724d",
+  "job_id": "discovery-real-21c70139721efc2d-gpt-4.1-mini",
+  "model": "gpt-4.1-mini",
+  "parsed": {
+    "actions": [],
+    "analysis_registration": "prospective_phase4_exploratory_discovery",
+    "coverage_complete": false,
+    "diagnostic_codes": [
+      "SOURCE_EXCERPT_MISMATCH"
+    ],
+    "exploratory_discovery": true,
+    "exploratory_posthoc": false,
+    "human_annotated": false,
+    "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+    "original_diagnostic_codes": [],
+    "original_protocol_valid": true,
+    "phase_adapter": {
+      "implementation_module": "tsg.phase_protocol_v3",
+      "original_exploratory_posthoc": true,
+      "phase_selection": {
+        "adapter_version": "phase_aware_posthoc_v1",
+        "commentary_count": 0,
+        "discarded_commentary_indices": [],
+        "exploratory_posthoc": true,
+        "final_answer_count": 0,
+        "message_count": 1,
+        "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+        "selected_output_index": 0,
+        "selection_mode": "single_unphased"
+      }
+    },
+    "phase_selection": {
+      "adapter_version": "phase_aware_posthoc_v1",
+      "commentary_count": 0,
+      "discarded_commentary_indices": [],
+      "final_answer_count": 0,
+      "message_count": 1,
+      "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+      "selected_output_index": 0,
+      "selection_mode": "single_unphased"
+    },
+    "prediction": {
+      "actions": [
+        {
+          "excerpt": "```bash\n# Check CRD presence\nkubectl get crd modeldeployments.airunway.ai\n\n# Check controller pod health\nkubectl get pods -n airunway-system -l control-plane=controller-manager\n```\n\n**If already installed and healthy:** Report version and pod status, skip to Step 3.\n\n**If not installed:** Ask user to confirm, then from the **repository root** run:",
+          "execution_role": "source_code",
+          "file": "references/steps/step-2-controller.md",
+          "line_end": 15,
+          "line_start": 7,
+          "operation": "command.exec",
+          "reason": "This step includes commands to check for CRD presence and controller pod health, and if not installed, commands to install the controller and CRDs, which are privileged cluster operations.",
+          "resource": "kubectl get crd modeldeployments.airunway.ai\nkubectl get pods -n airunway-system -l control-plane=controller-manager\nmake controller-install\nmake controller-deploy\nkubectl rollout status deployment/airunway-controller-manager -n airunway-system --timeout=120s"
+        },
+        {
+          "excerpt": "```bash\n# Check if providers are already registered\nkubectl get inferenceproviderconfigs --all-namespaces 2>/dev/null || kubectl get inferenceproviderconfigs\n```\n\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\n\n**If providers already registered:** Show name and status, skip installation.\n\n**Provider recommendation logic:**\n\n| Hardware | Use Case | Recommended Provider |\n|----------|----------|---------------------|\n| CPU-only | Any | KAITO (llama.cpp) |\n| GPUs | Standard inference (most users start here) | KAITO |\n| GPUs | High-throughput serving with separate prefill/decode phases | Dynamo |\n| GPUs | Already using Ray for ML workloads | KubeRay |\n\n> **Default to KAITO** unless the user has a specific reason to choose otherwise. KAITO is the simplest to set up and handles most use cases. Dynamo is for teams that need to independently scale the prefill and decode stages of inference for high throughput. KubeRay is for teams already invested in the Ray ecosystem.\n\nPresent recommendation with reasoning. Ask user to confirm before installing.\n\n**Installation** — from the **repository root**:\n\nFirst, check the provider's Makefile or README for the default image:\n\n```bash\n# List available providers and their default images\nls providers/\ncat providers/<provider>/Makefile | grep -E 'IMG\\s*\\?='\n```\n\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\n\nThen deploy:\n\n```bash\ncd providers/<provider>\nmake deploy IMG=<image>\n```\n\n> **Tip:** If the Makefile defines a default `IMG`, you can omit the `IMG=` argument and just run `make deploy`.\n\n**Verify registration:**\n\n```bash\nkubectl get inferenceproviderconfigs <provider> -o yaml\n```\n\nCheck `status.ready: true`. If not ready within 2 minutes, inspect provider pod logs",
+          "execution_role": "source_code",
+          "file": "references/steps/step-4-provider.md",
+          "line_end": 44,
+          "line_start": 7,
+          "operation": "command.exec",
+          "reason": "This step includes commands to check provider registration, list providers, deploy a provider via make, and verify provider readiness via kubectl, which are privileged cluster operations.",
+          "resource": "kubectl get inferenceproviderconfigs --all-namespaces\nls providers/\ncat providers/<provider>/Makefile\nmake deploy IMG=<image>\nkubectl get inferenceproviderconfigs <provider> -o yaml\nkubectl logs <pod-name>\nkubectl describe pod <pod-name>"
+        },
+        {
+          "excerpt": "```bash\n# Read token without echo, store in a securely permissioned temp file\nhf_token_file=\"$(mktemp)\"\ntrap 'rm -f \"$hf_token_file\"' EXIT\n\nread -r -s -p \"Enter HuggingFace token: \" hf_token\nprintf '\\n'\nprintf '%s' \"$hf_token\" > \"$hf_token_file\"\nchmod 600 \"$hf_token_file\"\nunset hf_token\n\nkubectl create secret generic hf-token \\\n  --from-file=token=\"$hf_token_file\" \\\n  -n <namespace> \\\n  --dry-run=client -o yaml | kubectl apply -f -\n```\n\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\n\n## Apply the ModelDeployment CR\n\nUse the appropriate manifest based on whether the model is gated.\n\n**For gated models (Llama etc. — requires HuggingFace token):**\n\n```bash\nkubectl apply -f - <<EOF\napiVersion: airunway.ai/v1alpha1\nkind: ModelDeployment\nmetadata:\n  name: <model-name>\n  namespace: <namespace>\nspec:\n  model:\n    id: <model-id>\n    huggingFaceTokenSecretRef:\n      name: hf-token\n      key: token\n  provider:\n    name: <provider-name>\nEOF\n```\n\n**For non-gated models (Phi-3, Gemma etc. — no token required):**\n\n```bash\nkubectl apply -f - <<EOF\napiVersion: airunway.ai/v1alpha1\nkind: ModelDeployment\nmetadata:\n  name: <model-name>\n  namespace: <namespace>\nspec:\n  model:\n    id: <model-id>\n  provider:\n    name: <provider-name>\nEOF\n```\n\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\n\n## Monitor Deployment\n\n```bash\nkubectl get modeldeployment <model-name> -n <namespace> -w\n```\n\nWait until `STATUS = Ready`. If not ready within 10 minutes:\n- `kubectl describe modeldeployment <model-name> -n <namespace>` — check events\n- `kubectl get pods -l modeldeployment=<model-name> -n <namespace>` — check pod status\n\n> **Note:** Large models (13B+) may take significantly longer than 10 minutes because weights must be downloaded",
+          "execution_role": "source_code",
+          "file": "references/steps/step-5-deploy.md",
+          "line_end": 69,
+          "line_start": 38,
+          "operation": "command.exec",
+          "reason": "This step includes commands to create a Kubernetes secret for HuggingFace token, apply a ModelDeployment custom resource, and monitor the deployment status, all of which are privileged cluster operations.",
+          "resource": "kubectl create secret generic hf-token --from-file=token=<tempfile> -n <namespace> --dry-run=client -o yaml | kubectl apply -f -\nkubectl apply -f - (ModelDeployment manifest)\nkubectl get modeldeployment <model-name> -n <namespace> -w\nkubectl describe modeldeployment <model-name> -n <namespace>\nkubectl get pods -l modeldeployment=<model-name> -n <namespace>"
+        },
+        {
+          "excerpt": "```bash\nENDPOINT=$(kubectl get modeldeployment <model-name> -n <namespace> -o jsonpath='{.status.endpoint}')\n\nif [ -z \"$ENDPOINT\" ]; then\n  echo \"Endpoint not yet available — model may still be starting\"\nelse\n  curl -X POST \"${ENDPOINT}/v1/chat/completions\" \\\n    -H \"Content-Type: application/json\" \\\n    -d '{\"model\": \"<model-id>\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}'\nfi\n```\n\n> **If the endpoint is a cluster-internal URL** (e.g., `http://svc-name.namespace:port`), set up port-forwarding first:\n>\n> ```bash\n> # Discover the service port (vLLM: 8000, llama.cpp: 8080)\n> SERVICE_PORT=$(kubectl get svc <service-name> -n <namespace> -o jsonpath='{.spec.ports[0].port}')\n>\n> kubectl port-forward svc/<service-name> 8080:${SERVICE_PORT} -n <namespace> &\n> # Then use http://localhost:8080 as the endpoint\n> ```",
+          "execution_role": "source_code",
+          "file": "references/steps/step-6-summary.md",
+          "line_end": 44,
+          "line_start": 26,
+          "operation": "command.exec",
+          "reason": "This step includes commands to retrieve the model deployment endpoint, perform a test HTTP POST request to the model endpoint, and optionally set up port forwarding to access cluster-internal services, which involve privileged cluster access and network operations.",
+          "resource": "kubectl get modeldeployment <model-name> -n <namespace> -o jsonpath='{.status.endpoint}'\ncurl -X POST \"${ENDPOINT}/v1/chat/completions\" -H \"Content-Type: application/json\" -d '{\"model\": \"<model-id>\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}'\nkubectl get svc <service-name> -n <namespace> -o jsonpath='{.spec.ports[0].port}'\nkubectl port-forward svc/<service-name> 8080:${SERVICE_PORT} -n <namespace> &"
+        }
+      ]
+    },
+    "protocol_valid": false,
+    "protocol_version": "phase4-discovery-v1",
+    "schema_errors": [],
+    "semantic_validity": "unverified",
+    "source_anchored": false,
+    "source_executed": false,
+    "source_sha256": {
+      "SKILL.md": "fff89af6c8c81005b48a073e470636f3b11ef3f991e55c109dae9f36105ffda7",
+      "references/gpu-profiles.md": "d9782a61870446dac17dc2b6c62049a586372ec14bfa18493d4926162b10807b",
+      "references/model-sizing.md": "00118f56befd015b53eb6df2572a8c5590fcaa3afd7f3b729c8d75fabfd8626f",
+      "references/powershell-notes.md": "82ee93effe3c62b87ff4b9520a06c814ccd42f8d25a620781865f8a564c91e81",
+      "references/steps/step-1-verify.md": "1d8776309855462b47d1094bfef0d02f7105f3d03f6902eea6de0a57636bf94e",
+      "references/steps/step-2-controller.md": "5088d7b90881e35db3d2f9d7a128eca6661487924338aaf057cfc22109701e93",
+      "references/steps/step-3-gpu.md": "882f657390c9fc55a87d657da9ac1c6ae18bc0730c0f9d64683d174d7d2892a8",
+      "references/steps/step-4-provider.md": "3a618de715c5594d12ded0e08189cf66843239dc234d86c541df268ac9dcbcff",
+      "references/steps/step-5-deploy.md": "14ce2057fbeb21d419fd0d9ebba00e42305dbbb959d595d18e55dc1fdeb43179",
+      "references/steps/step-6-summary.md": "fe7c9a47b2786b4eaefef1f3cc08fc6d11925fe9514610b72b7f41ceed7a39e7",
+      "references/troubleshooting.md": "59371f62e15f840c9fc3fdb68adcc8166106431f002beb3d6edeb294bdaa203c"
+    },
+    "text": "{\"actions\":[{\"file\":\"references/steps/step-2-controller.md\",\"line_start\":7,\"line_end\":15,\"excerpt\":\"```bash\\n# Check CRD presence\\nkubectl get crd modeldeployments.airunway.ai\\n\\n# Check controller pod health\\nkubectl get pods -n airunway-system -l control-plane=controller-manager\\n```\\n\\n**If already installed and healthy:** Report version and pod status, skip to Step 3.\\n\\n**If not installed:** Ask user to confirm, then from the **repository root** run:\",\"operation\":\"command.exec\",\"resource\":\"kubectl get crd modeldeployments.airunway.ai\\nkubectl get pods -n airunway-system -l control-plane=controller-manager\\nmake controller-install\\nmake controller-deploy\\nkubectl rollout status deployment/airunway-controller-manager -n airunway-system --timeout=120s\",\"execution_role\":\"source_code\",\"reason\":\"This step includes commands to check for CRD presence and controller pod health, and if not installed, commands to install the controller and CRDs, which are privileged cluster operations.\"},{\"file\":\"references/steps/step-4-provider.md\",\"line_start\":7,\"line_end\":44,\"excerpt\":\"```bash\\n# Check if providers are already registered\\nkubectl get inferenceproviderconfigs --all-namespaces 2>/dev/null || kubectl get inferenceproviderconfigs\\n```\\n\\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\\n\\n**If providers already registered:** Show name and status, skip installation.\\n\\n**Provider recommendation logic:**\\n\\n| Hardware | Use Case | Recommended Provider |\\n|----------|----------|---------------------|\\n| CPU-only | Any | KAITO (llama.cpp) |\\n| GPUs | Standard inference (most users start here) | KAITO |\\n| GPUs | High-throughput serving with separate prefill/decode phases | Dynamo |\\n| GPUs | Already using Ray for ML workloads | KubeRay |\\n\\n> **Default to KAITO** unless the user has a specific reason to choose otherwise. KAITO is the simplest to set up and handles most use cases. Dynamo is for teams that need to independently scale the prefill and decode stages of inference for high throughput. KubeRay is for teams already invested in the Ray ecosystem.\\n\\nPresent recommendation with reasoning. Ask user to confirm before installing.\\n\\n**Installation** — from the **repository root**:\\n\\nFirst, check the provider's Makefile or README for the default image:\\n\\n```bash\\n# List available providers and their default images\\nls providers/\\ncat providers/<provider>/Makefile | grep -E 'IMG\\\\s*\\\\?='\\n```\\n\\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\\n\\nThen deploy:\\n\\n```bash\\ncd providers/<provider>\\nmake deploy IMG=<image>\\n```\\n\\n> **Tip:** If the Makefile defines a default `IMG`, you can omit the `IMG=` argument and just run `make deploy`.\\n\\n**Verify registration:**\\n\\n```bash\\nkubectl get inferenceproviderconfigs <provider> -o yaml\\n```\\n\\nCheck `status.ready: true`. If not ready within 2 minutes, inspect provider pod logs\",\"operation\":\"command.exec\",\"resource\":\"kubectl get inferenceproviderconfigs --all-namespaces\\nls providers/\\ncat providers/<provider>/Makefile\\nmake deploy IMG=<image>\\nkubectl get inferenceproviderconfigs <provider> -o yaml\\nkubectl logs <pod-name>\\nkubectl describe pod <pod-name>\",\"execution_role\":\"source_code\",\"reason\":\"This step includes commands to check provider registration, list providers, deploy a provider via make, and verify provider readiness via kubectl, which are privileged cluster operations.\"},{\"file\":\"references/steps/step-5-deploy.md\",\"line_start\":38,\"line_end\":69,\"excerpt\":\"```bash\\n# Read token without echo, store in a securely permissioned temp file\\nhf_token_file=\\\"$(mktemp)\\\"\\ntrap 'rm -f \\\"$hf_token_file\\\"' EXIT\\n\\nread -r -s -p \\\"Enter HuggingFace token: \\\" hf_token\\nprintf '\\\\n'\\nprintf '%s' \\\"$hf_token\\\" > \\\"$hf_token_file\\\"\\nchmod 600 \\\"$hf_token_file\\\"\\nunset hf_token\\n\\nkubectl create secret generic hf-token \\\\\\n  --from-file=token=\\\"$hf_token_file\\\" \\\\\\n  -n <namespace> \\\\\\n  --dry-run=client -o yaml | kubectl apply -f -\\n```\\n\\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\\n\\n## Apply the ModelDeployment CR\\n\\nUse the appropriate manifest based on whether the model is gated.\\n\\n**For gated models (Llama etc. — requires HuggingFace token):**\\n\\n```bash\\nkubectl apply -f - <<EOF\\napiVersion: airunway.ai/v1alpha1\\nkind: ModelDeployment\\nmetadata:\\n  name: <model-name>\\n  namespace: <namespace>\\nspec:\\n  model:\\n    id: <model-id>\\n    huggingFaceTokenSecretRef:\\n      name: hf-token\\n      key: token\\n  provider:\\n    name: <provider-name>\\nEOF\\n```\\n\\n**For non-gated models (Phi-3, Gemma etc. — no token required):**\\n\\n```bash\\nkubectl apply -f - <<EOF\\napiVersion: airunway.ai/v1alpha1\\nkind: ModelDeployment\\nmetadata:\\n  name: <model-name>\\n  namespace: <namespace>\\nspec:\\n  model:\\n    id: <model-id>\\n  provider:\\n    name: <provider-name>\\nEOF\\n```\\n\\n> See [powershell-notes.md](../powershell-notes.md) for the PowerShell equivalent.\\n\\n## Monitor Deployment\\n\\n```bash\\nkubectl get modeldeployment <model-name> -n <namespace> -w\\n```\\n\\nWait until `STATUS = Ready`. If not ready within 10 minutes:\\n- `kubectl describe modeldeployment <model-name> -n <namespace>` — check events\\n- `kubectl get pods -l modeldeployment=<model-name> -n <namespace>` — check pod status\\n\\n> **Note:** Large models (13B+) may take significantly longer than 10 minutes because weights must be downloaded\",\"operation\":\"command.exec\",\"resource\":\"kubectl create secret generic hf-token --from-file=token=<tempfile> -n <namespace> --dry-run=client -o yaml | kubectl apply -f -\\nkubectl apply -f - (ModelDeployment manifest)\\nkubectl get modeldeployment <model-name> -n <namespace> -w\\nkubectl describe modeldeployment <model-name> -n <namespace>\\nkubectl get pods -l modeldeployment=<model-name> -n <namespace>\",\"execution_role\":\"source_code\",\"reason\":\"This step includes commands to create a Kubernetes secret for HuggingFace token, apply a ModelDeployment custom resource, and monitor the deployment status, all of which are privileged cluster operations.\"},{\"file\":\"references/steps/step-6-summary.md\",\"line_start\":26,\"line_end\":44,\"excerpt\":\"```bash\\nENDPOINT=$(kubectl get modeldeployment <model-name> -n <namespace> -o jsonpath='{.status.endpoint}')\\n\\nif [ -z \\\"$ENDPOINT\\\" ]; then\\n  echo \\\"Endpoint not yet available — model may still be starting\\\"\\nelse\\n  curl -X POST \\\"${ENDPOINT}/v1/chat/completions\\\" \\\\\\n    -H \\\"Content-Type: application/json\\\" \\\\\\n    -d '{\\\"model\\\": \\\"<model-id>\\\", \\\"messages\\\": [{\\\"role\\\": \\\"user\\\", \\\"content\\\": \\\"Hello!\\\"}]}'\\nfi\\n```\\n\\n> **If the endpoint is a cluster-internal URL** (e.g., `http://svc-name.namespace:port`), set up port-forwarding first:\\n>\\n> ```bash\\n> # Discover the service port (vLLM: 8000, llama.cpp: 8080)\\n> SERVICE_PORT=$(kubectl get svc <service-name> -n <namespace> -o jsonpath='{.spec.ports[0].port}')\\n>\\n> kubectl port-forward svc/<service-name> 8080:${SERVICE_PORT} -n <namespace> &\\n> # Then use http://localhost:8080 as the endpoint\\n> ```\",\"operation\":\"command.exec\",\"resource\":\"kubectl get modeldeployment <model-name> -n <namespace> -o jsonpath='{.status.endpoint}'\\ncurl -X POST \\\"${ENDPOINT}/v1/chat/completions\\\" -H \\\"Content-Type: application/json\\\" -d '{\\\"model\\\": \\\"<model-id>\\\", \\\"messages\\\": [{\\\"role\\\": \\\"user\\\", \\\"content\\\": \\\"Hello!\\\"}]}'\\nkubectl get svc <service-name> -n <namespace> -o jsonpath='{.spec.ports[0].port}'\\nkubectl port-forward svc/<service-name> 8080:${SERVICE_PORT} -n <namespace> &\",\"execution_role\":\"source_code\",\"reason\":\"This step includes commands to retrieve the model deployment endpoint, perform a test HTTP POST request to the model endpoint, and optionally set up port forwarding to access cluster-internal services, which involve privileged cluster access and network operations.\"}]}"
+  },
+  "raw_ref": "results/phase4/api/raw/be151d04e79ca9fffe98397bddb3633bc04db22a3343cc9c1a323474e3aa9498.json",
+  "raw_status": "completed",
+  "request_hash": "be151d04e79ca9fffe98397bddb3633bc04db22a3343cc9c1a323474e3aa9498",
+  "split": "validation",
+  "track": "discovery",
+  "usage": {
+    "input_tokens": 8233,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 2044,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 10277
+  },
+  "view": "raw"
+}

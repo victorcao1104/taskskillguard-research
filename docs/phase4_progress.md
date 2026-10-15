@@ -17,3 +17,15 @@
 - User raised remaining allowance toUSD15. Conservative cache-write accounting correction addsUSD0.575783225 to historical exposure; no old ledger bytes changed. Full planned request upper boundUSD5.651476575 fits the new allowance.
 - Actual Replay/enforcement:174 routes complete,173 isolated containers plus one deliberately missing reference. Strict manual necessity and finite causal dependence are separate. Artificial gate gives finite dependence but independent reference can refute task necessity. Spent/underbroad contracts intentionally reduce utility; failures and zero execution remain in all-plan denominators.
 - Human labels remain blank. Paid acquisition, final analysis, release verification and upload remain open.
+
+## Acquisition and analysis completion
+
+The preceding entries are chronological pre-acquisition records, not current status.
+
+- Primary384 first requests retained:361 protocol-valid,4HTTP520,2incomplete,17source-excerpt failures. Synthetic144/144 and real212/216 valid. No automatic retries or replacement of primary results.
+- Family-paired graph-versus-table analysis shows no consistent edge gain; all exact-accuracy difference intervals contain zero. Original real and synthetic populations are not conflated.
+- Independent inspection of discovery135 proposals found zero exact excerpt/span matches, so a separate posthoc24-job line-ID protocol repair was frozen.24/24API completed,20/24valid,109source-anchored unverified proposals;4bad spans remain failures.
+- Independent publication review removed extractor classifications from rater packets, added dedicated source-only context, and prevented overwriting existing human work. It also tightened unsupported causal wording and the distinction between agent-authored finite truth and human truth.
+- Local regression:581passed,4skipped,150subtests. Original180bundles/3414files checked read-only;18444baselinefiles remain unchanged.
+- Final expense upper: historical corrected14.551575125 + primary1.10304535 + followup0.089932875 =15.74455335USD; remaining under revised allowance13.807021775USD. Provider invoice is not claimed.
+- At local publication freeze, release hash verification, remote upload and CI are the final gates. Their live completion evidence is the remote commit and associated checks; this chronological entry is not an assertion that upload already occurred. Human annotation remains explicitly deferred.

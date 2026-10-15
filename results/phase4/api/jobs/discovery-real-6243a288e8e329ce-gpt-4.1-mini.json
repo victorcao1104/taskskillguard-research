@@ -1,0 +1,119 @@
+{
+  "case_id": "real-6243a288e8e329ce",
+  "context": "nonexecuting_candidate_discovery",
+  "elapsed_seconds": 7.3047177999978885,
+  "family": "family-d7281eb2215ba350",
+  "job_id": "discovery-real-6243a288e8e329ce-gpt-4.1-mini",
+  "model": "gpt-4.1-mini",
+  "parsed": {
+    "actions": [],
+    "analysis_registration": "prospective_phase4_exploratory_discovery",
+    "coverage_complete": false,
+    "diagnostic_codes": [
+      "SOURCE_EXCERPT_MISMATCH"
+    ],
+    "exploratory_discovery": true,
+    "exploratory_posthoc": false,
+    "human_annotated": false,
+    "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+    "original_diagnostic_codes": [],
+    "original_protocol_valid": true,
+    "phase_adapter": {
+      "implementation_module": "tsg.phase_protocol_v3",
+      "original_exploratory_posthoc": true,
+      "phase_selection": {
+        "adapter_version": "phase_aware_posthoc_v1",
+        "commentary_count": 0,
+        "discarded_commentary_indices": [],
+        "exploratory_posthoc": true,
+        "final_answer_count": 0,
+        "message_count": 1,
+        "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+        "selected_output_index": 0,
+        "selection_mode": "single_unphased"
+      }
+    },
+    "phase_selection": {
+      "adapter_version": "phase_aware_posthoc_v1",
+      "commentary_count": 0,
+      "discarded_commentary_indices": [],
+      "final_answer_count": 0,
+      "message_count": 1,
+      "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+      "selected_output_index": 0,
+      "selection_mode": "single_unphased"
+    },
+    "prediction": {
+      "actions": [
+        {
+          "excerpt": "// middleware.ts\nimport { createServerClient } from '@supabase/ssr'\nimport { NextResponse, type NextRequest } from 'next/server'\n\nexport async function middleware(request: NextRequest) {\n  let response = NextResponse.next({ request })\n\n  const supabase = createServerClient(\n    process.env.NEXT_PUBLIC_SUPABASE_URL!,\n    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,\n    {\n      cookies: {\n        getAll() {\n          return request.cookies.getAll()\n        },\n        setAll(cookiesToSet) {\n          cookiesToSet.forEach(({ name, value, options }) => {\n            response.cookies.set(name, value, options)\n          })\n        },\n      },\n    }\n  )\n\n  // Refresh session if expired\n  const { data: { user } } = await supabase.auth.getUser()\n\n  // Protect dashboard routes\n  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {\n    return NextResponse.redirect(new URL('/login', request.url))\n  }\n\n  return response\n}\n\nexport const config = {\n  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],\n}",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 59,
+          "line_start": 38,
+          "operation": "unknown",
+          "reason": "Middleware function reads request cookies, sets response cookies, calls supabase.auth.getUser() to refresh session, and conditionally redirects unauthenticated users from /dashboard to /login. This involves privileged session management and HTTP response manipulation.",
+          "resource": "middleware.ts"
+        },
+        {
+          "excerpt": "// app/auth/callback/route.ts\nimport { createClient } from '@/lib/supabase/server'\nimport { NextResponse } from 'next/server'\n\nexport async function GET(request: Request) {\n  const { searchParams, origin } = new URL(request.url)\n  const code = searchParams.get('code')\n  const next = searchParams.get('next') ?? '/'\n\n  if (code) {\n    const supabase = await createClient()\n    const { error } = await supabase.auth.exchangeCodeForSession(code)\n    if (!error) {\n      return NextResponse.redirect(`${origin}${next}`)\n    }\n  }\n\n  return NextResponse.redirect(`${origin}/auth/error`)\n}",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 77,
+          "line_start": 61,
+          "operation": "unknown",
+          "reason": "Handles OAuth callback by exchanging code for session via supabase.auth.exchangeCodeForSession, then redirects user accordingly. This involves privileged auth session creation and HTTP redirect response.",
+          "resource": "app/auth/callback/route.ts"
+        },
+        {
+          "excerpt": "// app/actions/auth.ts\n'use server'\nimport { createClient } from '@/lib/supabase/server'\nimport { redirect } from 'next/navigation'\nimport { revalidatePath } from 'next/cache'\n\nexport async function signIn(formData: FormData) {\n  const supabase = await createClient()\n  const { error } = await supabase.auth.signInWithPassword({\n    email: formData.get('email') as string,\n    password: formData.get('password') as string,\n  })\n\n  if (error) {\n    return { error: error.message }\n  }\n\n  revalidatePath('/', 'layout')\n  redirect('/dashboard')\n}\n\nexport async function signOut() {\n  const supabase = await createClient()\n  await supabase.auth.signOut()\n  revalidatePath('/', 'layout')\n  redirect('/')\n}",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 102,
+          "line_start": 79,
+          "operation": "unknown",
+          "reason": "Server Actions signIn and signOut perform privileged auth operations via supabase.auth.signInWithPassword and supabase.auth.signOut, then trigger cache revalidation and HTTP redirects. These actions handle user authentication state changes.",
+          "resource": "app/actions/auth.ts"
+        },
+        {
+          "excerpt": "// app/dashboard/page.tsx\nimport { createClient } from '@/lib/supabase/server'\nimport { redirect } from 'next/navigation'\n\nexport default async function DashboardPage() {\n  const supabase = await createClient()\n  const { data: { user } } = await supabase.auth.getUser()\n\n  if (!user) {\n    redirect('/login')\n  }\n\n  return (\n    <div>\n      <h1>Welcome, {user.email}</h1>\n    </div>\n  )\n}",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 117,
+          "line_start": 104,
+          "operation": "unknown",
+          "reason": "Server Component fetches authenticated user via supabase.auth.getUser and redirects to /login if unauthenticated. This involves privileged user session access and conditional navigation.",
+          "resource": "app/dashboard/page.tsx"
+        }
+      ]
+    },
+    "protocol_valid": false,
+    "protocol_version": "phase4-discovery-v1",
+    "schema_errors": [],
+    "semantic_validity": "unverified",
+    "source_anchored": false,
+    "source_executed": false,
+    "source_sha256": {
+      "SKILL.md": "82bbd17e1a3179f86172a438c6ef4b7b69e653cb2af1532c6fbaf957ff7b3edf"
+    },
+    "text": "{\"actions\":[{\"file\":\"SKILL.md\",\"line_start\":38,\"line_end\":59,\"excerpt\":\"// middleware.ts\\nimport { createServerClient } from '@supabase/ssr'\\nimport { NextResponse, type NextRequest } from 'next/server'\\n\\nexport async function middleware(request: NextRequest) {\\n  let response = NextResponse.next({ request })\\n\\n  const supabase = createServerClient(\\n    process.env.NEXT_PUBLIC_SUPABASE_URL!,\\n    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,\\n    {\\n      cookies: {\\n        getAll() {\\n          return request.cookies.getAll()\\n        },\\n        setAll(cookiesToSet) {\\n          cookiesToSet.forEach(({ name, value, options }) => {\\n            response.cookies.set(name, value, options)\\n          })\\n        },\\n      },\\n    }\\n  )\\n\\n  // Refresh session if expired\\n  const { data: { user } } = await supabase.auth.getUser()\\n\\n  // Protect dashboard routes\\n  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {\\n    return NextResponse.redirect(new URL('/login', request.url))\\n  }\\n\\n  return response\\n}\\n\\nexport const config = {\\n  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],\\n}\",\"operation\":\"unknown\",\"resource\":\"middleware.ts\",\"execution_role\":\"source_code\",\"reason\":\"Middleware function reads request cookies, sets response cookies, calls supabase.auth.getUser() to refresh session, and conditionally redirects unauthenticated users from /dashboard to /login. This involves privileged session management and HTTP response manipulation.\"},{\"file\":\"SKILL.md\",\"line_start\":61,\"line_end\":77,\"excerpt\":\"// app/auth/callback/route.ts\\nimport { createClient } from '@/lib/supabase/server'\\nimport { NextResponse } from 'next/server'\\n\\nexport async function GET(request: Request) {\\n  const { searchParams, origin } = new URL(request.url)\\n  const code = searchParams.get('code')\\n  const next = searchParams.get('next') ?? '/'\\n\\n  if (code) {\\n    const supabase = await createClient()\\n    const { error } = await supabase.auth.exchangeCodeForSession(code)\\n    if (!error) {\\n      return NextResponse.redirect(`${origin}${next}`)\\n    }\\n  }\\n\\n  return NextResponse.redirect(`${origin}/auth/error`)\\n}\",\"operation\":\"unknown\",\"resource\":\"app/auth/callback/route.ts\",\"execution_role\":\"source_code\",\"reason\":\"Handles OAuth callback by exchanging code for session via supabase.auth.exchangeCodeForSession, then redirects user accordingly. This involves privileged auth session creation and HTTP redirect response.\"},{\"file\":\"SKILL.md\",\"line_start\":79,\"line_end\":102,\"excerpt\":\"// app/actions/auth.ts\\n'use server'\\nimport { createClient } from '@/lib/supabase/server'\\nimport { redirect } from 'next/navigation'\\nimport { revalidatePath } from 'next/cache'\\n\\nexport async function signIn(formData: FormData) {\\n  const supabase = await createClient()\\n  const { error } = await supabase.auth.signInWithPassword({\\n    email: formData.get('email') as string,\\n    password: formData.get('password') as string,\\n  })\\n\\n  if (error) {\\n    return { error: error.message }\\n  }\\n\\n  revalidatePath('/', 'layout')\\n  redirect('/dashboard')\\n}\\n\\nexport async function signOut() {\\n  const supabase = await createClient()\\n  await supabase.auth.signOut()\\n  revalidatePath('/', 'layout')\\n  redirect('/')\\n}\",\"operation\":\"unknown\",\"resource\":\"app/actions/auth.ts\",\"execution_role\":\"source_code\",\"reason\":\"Server Actions signIn and signOut perform privileged auth operations via supabase.auth.signInWithPassword and supabase.auth.signOut, then trigger cache revalidation and HTTP redirects. These actions handle user authentication state changes.\"},{\"file\":\"SKILL.md\",\"line_start\":104,\"line_end\":117,\"excerpt\":\"// app/dashboard/page.tsx\\nimport { createClient } from '@/lib/supabase/server'\\nimport { redirect } from 'next/navigation'\\n\\nexport default async function DashboardPage() {\\n  const supabase = await createClient()\\n  const { data: { user } } = await supabase.auth.getUser()\\n\\n  if (!user) {\\n    redirect('/login')\\n  }\\n\\n  return (\\n    <div>\\n      <h1>Welcome, {user.email}</h1>\\n    </div>\\n  )\\n}\",\"operation\":\"unknown\",\"resource\":\"app/dashboard/page.tsx\",\"execution_role\":\"source_code\",\"reason\":\"Server Component fetches authenticated user via supabase.auth.getUser and redirects to /login if unauthenticated. This involves privileged user session access and conditional navigation.\"}]}"
+  },
+  "raw_ref": "results/phase4/api/raw/1e493745a3b1aff625125a9c50a16e85283f8777ae53f39c95ccc26902e84151.json",
+  "raw_status": "completed",
+  "request_hash": "1e493745a3b1aff625125a9c50a16e85283f8777ae53f39c95ccc26902e84151",
+  "split": "validation",
+  "track": "discovery",
+  "usage": {
+    "input_tokens": 2697,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 1086,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 3783
+  },
+  "view": "raw"
+}

@@ -1,0 +1,129 @@
+{
+  "case_id": "real-a9c944bdb8bd121b",
+  "context": "nonexecuting_candidate_discovery",
+  "elapsed_seconds": 8.768316700006835,
+  "family": "family-837b47fba8872a47",
+  "job_id": "discovery-real-a9c944bdb8bd121b-gpt-4.1-mini",
+  "model": "gpt-4.1-mini",
+  "parsed": {
+    "actions": [],
+    "analysis_registration": "prospective_phase4_exploratory_discovery",
+    "coverage_complete": false,
+    "diagnostic_codes": [
+      "SOURCE_EXCERPT_MISMATCH"
+    ],
+    "exploratory_discovery": true,
+    "exploratory_posthoc": false,
+    "human_annotated": false,
+    "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+    "original_diagnostic_codes": [],
+    "original_protocol_valid": true,
+    "phase_adapter": {
+      "implementation_module": "tsg.phase_protocol_v3",
+      "original_exploratory_posthoc": true,
+      "phase_selection": {
+        "adapter_version": "phase_aware_posthoc_v1",
+        "commentary_count": 0,
+        "discarded_commentary_indices": [],
+        "exploratory_posthoc": true,
+        "final_answer_count": 0,
+        "message_count": 1,
+        "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+        "selected_output_index": 0,
+        "selection_mode": "single_unphased"
+      }
+    },
+    "phase_selection": {
+      "adapter_version": "phase_aware_posthoc_v1",
+      "commentary_count": 0,
+      "discarded_commentary_indices": [],
+      "final_answer_count": 0,
+      "message_count": 1,
+      "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+      "selected_output_index": 0,
+      "selection_mode": "single_unphased"
+    },
+    "prediction": {
+      "actions": [
+        {
+          "excerpt": "Before any paid MCP call, call `identity_balance({verbose: true})` once. Surface the current balance, recent burn rate, and remaining runway, then gate the run with this exact message:\n\n> Estimated cost: about 4,000 credits (~$40) for a typical Seedance UGC ad with fallback/retry budget. This exceeds $5, so Reply `proceed` to continue or `cancel` to stop.\n\nDo not call any paid MCP tool until the user replies `proceed`. If the user replies `cancel`, stop without generating. The gate runs after the product URL is known and before avatar analysis, screenshot capture, video generation, captions, or paid retries.",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 48,
+          "line_start": 44,
+          "operation": "command.exec",
+          "reason": "This step involves calling identity_balance to check user credits before any paid call, gating further paid operations on user consent.",
+          "resource": "identity_balance({verbose: true})"
+        },
+        {
+          "excerpt": "### 3. Capture the product screenshot (best-effort)\n\nCall `capture_website` with `mode: \"screenshot\"`. Use `mobile=true` for handheld-product categories (APP / FITNESS / BEAUTY) so the captured page renders as a portrait phone screen; `mobile=false` for desktop-context categories (HAUL / TECH / FOOD).\n\nIf the call fails (timeout, browser pool down), retry **once**. If still failing, proceed without the screenshot — the skill is degraded but functional. The close-up beat then describes the page from prose only and Beat 2's `reference_images` is just `[avatar_url]`.\n\nCapture URL → `screenshot_url` (or null).",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 115,
+          "line_start": 111,
+          "operation": "command.exec",
+          "reason": "This step calls capture_website to get a screenshot of the product page, with a retry on failure, enabling visual reference in the ad.",
+          "resource": "capture_website"
+        },
+        {
+          "excerpt": "### 2.5 Avatar-type probe for creator portraits\n\nRun this probe before Step 7 and before any paid `generate_reference_video` call. It applies to caller-supplied `avatar_url`, the built-in fallback, or any creator portrait chosen as `@Image1`. The built-in fallback is already a non-IP stylized creator, but still document its source in the final summary.\n\nCall `analyze_media` once:\n\n```\nquery: \"Classify this image for paid video generation. Is it a photograph of a real human face, an AI-generated realistic portrait, a stylized / illustrated character, or a recognizable trademarked / copyrighted character such as Batman, Pikachu, or Mickey Mouse? Return strict JSON only: { \\\"avatar_type\\\": \\\"real_human\\\" | \\\"ai_realistic\\\" | \\\"stylized_illustrated\\\" | \\\"recognized_ip\\\", \\\"recognized_character\\\": string | null, \\\"moderation_risk\\\": \\\"low\\\" | \\\"medium\\\" | \\\"high\\\", \\\"recommendation\\\": \\\"proceed\\\" | \\\"warn\\\" | \\\"reject\\\" }. Use null for `recognized_character` when no specific character is recognized; never write \\\"none\\\", \\\"unknown\\\", or explanatory prose in that field.\"\n```",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 132,
+          "line_start": 123,
+          "operation": "command.exec",
+          "reason": "This step calls analyze_media to classify the avatar image for moderation and IP risk before paid video generation.",
+          "resource": "analyze_media"
+        },
+        {
+          "excerpt": "Route from the result:\n- **recognized IP / copyright risk** -> **STOP only when** `avatar_type` is `\"recognized_ip\"`, or `recognized_character` names a specific character (for example `\"Batman\"`), or when both `moderation_risk` is `\"high\"` and `recommendation` is `\"reject\"`. Treat `recognized_character: null`, empty string, `\"none\"`, `\"unknown\"`, `\"n/a\"`, and low/medium `moderation_risk` as not enough to stop by themselves. Run this check before the real/stylized routes. A chibi Batman is still Batman even when `avatar_type` is stylized / illustrated.\n- **real human / AI-generated realistic** -> proceed normally.\n- **stylized / illustrated** -> proceed with a visible warning that stylized avatars may be accepted by Kling but can be inconsistent under Seedance moderation; continue only if the user supplied or accepted that avatar.\n- **trademarked / copyrighted** -> **STOP** before generation. Surface this message: `The avatar appears to be a trademarked character ([X]). Most video providers will moderate this and refuse to generate. Pass avatar_url=<real-looking-photo-url> to override.`",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 147,
+          "line_start": 140,
+          "operation": "unknown",
+          "reason": "This logic interprets the analyze_media result to decide whether to proceed, warn, or stop based on avatar IP and moderation risk.",
+          "resource": "avatar_type classification result"
+        },
+        {
+          "excerpt": "### 7. Generate — first attempt with the avatar, cartoonize on rejection, retry\n\nAfter the Avatar-type probe in step 2.5 passes, attempt the call **first** with the avatar resolved in step 2 (caller-supplied or built-in fallback) exactly as-is. Only when seedance rejects the call do we restyle.\n\nRetry budget: Seedance generation gets at most 2 total video attempts: the original avatar render in 7a, plus one cartoonized-avatar retry in 7c. Do no",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 160,
+          "line_start": 154,
+          "operation": "command.exec",
+          "reason": "This step calls generate_reference_video to produce the UGC ad video, with a retry using a cartoonized avatar if the first attempt is rejected.",
+          "resource": "generate_reference_video"
+        }
+      ]
+    },
+    "protocol_valid": false,
+    "protocol_version": "phase4-discovery-v1",
+    "schema_errors": [],
+    "semantic_validity": "unverified",
+    "source_anchored": false,
+    "source_executed": false,
+    "source_sha256": {
+      "SKILL.md": "f7678a790f64b690bd959bebec0030f28b699c0bc72031c9bd54b2158ccd521d"
+    },
+    "text": "{\"actions\":[{\"file\":\"SKILL.md\",\"line_start\":44,\"line_end\":48,\"excerpt\":\"Before any paid MCP call, call `identity_balance({verbose: true})` once. Surface the current balance, recent burn rate, and remaining runway, then gate the run with this exact message:\\n\\n> Estimated cost: about 4,000 credits (~$40) for a typical Seedance UGC ad with fallback/retry budget. This exceeds $5, so Reply `proceed` to continue or `cancel` to stop.\\n\\nDo not call any paid MCP tool until the user replies `proceed`. If the user replies `cancel`, stop without generating. The gate runs after the product URL is known and before avatar analysis, screenshot capture, video generation, captions, or paid retries.\",\"operation\":\"command.exec\",\"resource\":\"identity_balance({verbose: true})\",\"execution_role\":\"source_code\",\"reason\":\"This step involves calling identity_balance to check user credits before any paid call, gating further paid operations on user consent.\"},{\"file\":\"SKILL.md\",\"line_start\":111,\"line_end\":115,\"excerpt\":\"### 3. Capture the product screenshot (best-effort)\\n\\nCall `capture_website` with `mode: \\\"screenshot\\\"`. Use `mobile=true` for handheld-product categories (APP / FITNESS / BEAUTY) so the captured page renders as a portrait phone screen; `mobile=false` for desktop-context categories (HAUL / TECH / FOOD).\\n\\nIf the call fails (timeout, browser pool down), retry **once**. If still failing, proceed without the screenshot — the skill is degraded but functional. The close-up beat then describes the page from prose only and Beat 2's `reference_images` is just `[avatar_url]`.\\n\\nCapture URL → `screenshot_url` (or null).\",\"operation\":\"command.exec\",\"resource\":\"capture_website\",\"execution_role\":\"source_code\",\"reason\":\"This step calls capture_website to get a screenshot of the product page, with a retry on failure, enabling visual reference in the ad.\"},{\"file\":\"SKILL.md\",\"line_start\":123,\"line_end\":132,\"excerpt\":\"### 2.5 Avatar-type probe for creator portraits\\n\\nRun this probe before Step 7 and before any paid `generate_reference_video` call. It applies to caller-supplied `avatar_url`, the built-in fallback, or any creator portrait chosen as `@Image1`. The built-in fallback is already a non-IP stylized creator, but still document its source in the final summary.\\n\\nCall `analyze_media` once:\\n\\n```\\nquery: \\\"Classify this image for paid video generation. Is it a photograph of a real human face, an AI-generated realistic portrait, a stylized / illustrated character, or a recognizable trademarked / copyrighted character such as Batman, Pikachu, or Mickey Mouse? Return strict JSON only: { \\\\\\\"avatar_type\\\\\\\": \\\\\\\"real_human\\\\\\\" | \\\\\\\"ai_realistic\\\\\\\" | \\\\\\\"stylized_illustrated\\\\\\\" | \\\\\\\"recognized_ip\\\\\\\", \\\\\\\"recognized_character\\\\\\\": string | null, \\\\\\\"moderation_risk\\\\\\\": \\\\\\\"low\\\\\\\" | \\\\\\\"medium\\\\\\\" | \\\\\\\"high\\\\\\\", \\\\\\\"recommendation\\\\\\\": \\\\\\\"proceed\\\\\\\" | \\\\\\\"warn\\\\\\\" | \\\\\\\"reject\\\\\\\" }. Use null for `recognized_character` when no specific character is recognized; never write \\\\\\\"none\\\\\\\", \\\\\\\"unknown\\\\\\\", or explanatory prose in that field.\\\"\\n```\",\"operation\":\"command.exec\",\"resource\":\"analyze_media\",\"execution_role\":\"source_code\",\"reason\":\"This step calls analyze_media to classify the avatar image for moderation and IP risk before paid video generation.\"},{\"file\":\"SKILL.md\",\"line_start\":140,\"line_end\":147,\"excerpt\":\"Route from the result:\\n- **recognized IP / copyright risk** -> **STOP only when** `avatar_type` is `\\\"recognized_ip\\\"`, or `recognized_character` names a specific character (for example `\\\"Batman\\\"`), or when both `moderation_risk` is `\\\"high\\\"` and `recommendation` is `\\\"reject\\\"`. Treat `recognized_character: null`, empty string, `\\\"none\\\"`, `\\\"unknown\\\"`, `\\\"n/a\\\"`, and low/medium `moderation_risk` as not enough to stop by themselves. Run this check before the real/stylized routes. A chibi Batman is still Batman even when `avatar_type` is stylized / illustrated.\\n- **real human / AI-generated realistic** -> proceed normally.\\n- **stylized / illustrated** -> proceed with a visible warning that stylized avatars may be accepted by Kling but can be inconsistent under Seedance moderation; continue only if the user supplied or accepted that avatar.\\n- **trademarked / copyrighted** -> **STOP** before generation. Surface this message: `The avatar appears to be a trademarked character ([X]). Most video providers will moderate this and refuse to generate. Pass avatar_url=<real-looking-photo-url> to override.`\",\"operation\":\"unknown\",\"resource\":\"avatar_type classification result\",\"execution_role\":\"source_code\",\"reason\":\"This logic interprets the analyze_media result to decide whether to proceed, warn, or stop based on avatar IP and moderation risk.\"},{\"file\":\"SKILL.md\",\"line_start\":154,\"line_end\":160,\"excerpt\":\"### 7. Generate — first attempt with the avatar, cartoonize on rejection, retry\\n\\nAfter the Avatar-type probe in step 2.5 passes, attempt the call **first** with the avatar resolved in step 2 (caller-supplied or built-in fallback) exactly as-is. Only when seedance rejects the call do we restyle.\\n\\nRetry budget: Seedance generation gets at most 2 total video attempts: the original avatar render in 7a, plus one cartoonized-avatar retry in 7c. Do no\",\"operation\":\"command.exec\",\"resource\":\"generate_reference_video\",\"execution_role\":\"source_code\",\"reason\":\"This step calls generate_reference_video to produce the UGC ad video, with a retry using a cartoonized avatar if the first attempt is rejected.\"}]}"
+  },
+  "raw_ref": "results/phase4/api/raw/82df43e12ab550bcb89bc2eb7ea0f00f38bb1f59e962798b25cdf2bd2c165e3f.json",
+  "raw_status": "completed",
+  "request_hash": "82df43e12ab550bcb89bc2eb7ea0f00f38bb1f59e962798b25cdf2bd2c165e3f",
+  "split": "development",
+  "track": "discovery",
+  "usage": {
+    "input_tokens": 6629,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 1288,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 7917
+  },
+  "view": "raw"
+}

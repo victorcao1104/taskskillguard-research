@@ -1,0 +1,260 @@
+{
+  "case_id": "real-b495eaee14818225",
+  "context": "nonexecuting_candidate_discovery_protocol_repair",
+  "elapsed_seconds": 5.118007800003397,
+  "family": "family-837a87cc1e9487fb",
+  "job_id": "discovery4b_28a312d602539692401a",
+  "model": "gpt-4.1-mini",
+  "original_job_id": "discovery-real-b495eaee14818225-gpt-4.1-mini",
+  "parsed": {
+    "actions": [
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0038",
+        "excerpt": "URL=\"<url>\"\nCONTENT_TYPE=\"$(curl -sIL \"$URL\" | awk -F': ' 'tolower($1)==\"content-type\"{print tolower($2)}' | tr -d '\\r' | tail -1)\"\n\nif echo \"$CONTENT_TYPE\" | grep -q \"markdown\"; then\n  curl -sL \"$URL\"",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_333379a309a2a77583727c3e",
+        "invocation_proven": false,
+        "line_end": 38,
+        "line_start": 34,
+        "operation": "command.exec",
+        "reason": "Shell script uses curl to fetch content from a URL, reading HTTP headers and body for markdown or HTML extraction.",
+        "resource": "curl command-line tool",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0034"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0043",
+        "excerpt": "  curl -sL \"$URL\" \\\n    | html2markdown \\\n        --include-selector \"article,main,[role=main]\" \\\n        --exclude-selector \"nav,header,footer,script,style\"",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_8c0e95f9a89df7e806fa49fb",
+        "invocation_proven": false,
+        "line_end": 43,
+        "line_start": 40,
+        "operation": "command.exec",
+        "reason": "Shell pipeline uses curl and html2markdown to convert HTML content to markdown using CSS selectors for inclusion and exclusion.",
+        "resource": "html2markdown command-line tool",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0040"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F0:L0086",
+        "excerpt": "bun ~/.claude/skills/web-fetch/fetch.ts \"<url>\"",
+        "execution_role": "instruction",
+        "file": "SKILL.md",
+        "id": "d4b_844828606e6cbf84fc29d6cd",
+        "invocation_proven": false,
+        "line_end": 86,
+        "line_start": 86,
+        "operation": "command.exec",
+        "reason": "Shell command runs a Bun script fetch.ts to fetch and convert web content to markdown as a fallback when selectors fail.",
+        "resource": "bun runtime executing fetch.ts script",
+        "semantic_validity": "unverified",
+        "start_id": "F0:L0086"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F1:L0015",
+        "excerpt": "// Step 1: Fetch\nconst response = await fetch(url, {\n  headers: {\n    \"User-Agent\": \"Mozilla/5.0 (compatible; ClaudeCode/1.0)\",\n  },\n});",
+        "execution_role": "source_code",
+        "file": "fetch.ts",
+        "id": "d4b_e7b1ac759aec2b3c0a37bc20",
+        "invocation_proven": false,
+        "line_end": 15,
+        "line_start": 10,
+        "operation": "network.get",
+        "reason": "fetch.ts script performs HTTP GET request to the provided URL with a custom User-Agent header.",
+        "resource": "url from process.argv[2]",
+        "semantic_validity": "unverified",
+        "start_id": "F1:L0010"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F1:L0022",
+        "excerpt": "\nconst html = await response.text();",
+        "execution_role": "source_code",
+        "file": "fetch.ts",
+        "id": "d4b_ea9b36c711db04f18a53e4a0",
+        "invocation_proven": false,
+        "line_end": 22,
+        "line_start": 21,
+        "operation": "unknown",
+        "reason": "Reads response body text from the HTTP response for further processing.",
+        "resource": "unknown",
+        "semantic_validity": "unverified",
+        "start_id": "F1:L0021"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F1:L0069",
+        "excerpt": "// Remove navigation elements\nconst removeSelectors = [\n  \"nav\",\n  \"header\",\n  \"footer\",\n  \"script\",\n  \"style\",\n  \"noscript\",\n  '[role=\"navigation\"]',\n  \".sidebar\",\n  \".nav\",\n  \".menu\",\n  \".toc\",\n  '[aria-label=\"breadcrumb\"]',\n];\n\nfor (const selector of removeSelectors) {\n  contentEl.querySelectorAll(selector).forEach((el) => el.remove());",
+        "execution_role": "source_code",
+        "file": "fetch.ts",
+        "id": "d4b_f915899a52fa62a803a68537",
+        "invocation_proven": false,
+        "line_end": 69,
+        "line_start": 52,
+        "operation": "unknown",
+        "reason": "Removes navigation and UI elements from the selected content element in the DOM before markdown conversion.",
+        "resource": "DOM elements matching selectors like nav, header, footer, script, style, etc.",
+        "semantic_validity": "unverified",
+        "start_id": "F1:L0052"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F1:L0123",
+        "excerpt": "// Step 5: Convert to Markdown with Turndown\nconst turndown = new TurndownService({\n  headingStyle: \"atx\",\n  codeBlockStyle: \"fenced\",\n});\n\n// Better code block handling\nturndown.addRule(\"fencedCodeBlock\", {\n  filter: (node) => {\n    return (\n      node.nodeName === \"PRE\" &&\n      node.firstChild &&\n      node.firstChild.nodeName === \"CODE\"\n    );\n  },\n  replacement: (content, node) => {\n    const el = node as Element;\n    const code = el.querySelector(\"code\");\n    const className = code?.className || \"\";\n    const lang = className.match(/language-(\\w+)/)?.[1] || \"\";\n    const text = code?.textContent || \"\";\n    return `\\n\\`\\`\\`${lang}\\n${text}\\n\\`\\`\\`\\n`;\n  },\n});\n\n// Handle pre without code child\nturndown.addRule(\"preBlock\", {\n  filter: (node) => {\n    return (\n      node.nodeName === \"PRE\" &&\n      (!node.firstChild || node.firstChild.nodeName !== \"CODE\")\n    );\n  },\n  replacement: (content, node) => {\n    const text = (node as Element).textContent || \"\";\n    return `\\n\\`\\`\\`\\n${text}\\n\\`\\`\\`\\n`;\n  },\n});\n\n// Remove \"Copy page\" buttons and similar UI elements\nturndown.addRule(\"removeButtons\", {\n  filter: (node) => {\n    if (node.nodeName === \"BUTTON\") return true;\n    const el = node as Element;\n    if (el.getAttribute?.(\"aria-label\")?.includes(\"Copy\")) return true;\n    return false;\n  },\n  replacement: () => \"\",\n});\n\nconst markdown = turndown.turndown(contentEl.innerHTML);\n",
+        "execution_role": "source_code",
+        "file": "fetch.ts",
+        "id": "d4b_847ae4e77447e10fdd8d87cb",
+        "invocation_proven": false,
+        "line_end": 123,
+        "line_start": 72,
+        "operation": "unknown",
+        "reason": "Converts cleaned HTML content element innerHTML to markdown using TurndownService with custom rules.",
+        "resource": "contentEl.innerHTML",
+        "semantic_validity": "unverified",
+        "start_id": "F1:L0072"
+      },
+      {
+        "authorization_source": false,
+        "end_id": "F1:L0142",
+        "excerpt": "// Output with title\nconst title = document.title || \"Untitled\";\nconsole.log(`# ${title}\\n`);\nconsole.log(cleaned);",
+        "execution_role": "source_code",
+        "file": "fetch.ts",
+        "id": "d4b_5a0c1590762c94998f972a4e",
+        "invocation_proven": false,
+        "line_end": 142,
+        "line_start": 139,
+        "operation": "unknown",
+        "reason": "Outputs the final markdown content with a title extracted from the document.",
+        "resource": "console output",
+        "semantic_validity": "unverified",
+        "start_id": "F1:L0139"
+      }
+    ],
+    "analysis_registration": "posthoc_protocol_repair_exploratory",
+    "anchoring_by_construction": true,
+    "coverage_complete": false,
+    "diagnostic_codes": [],
+    "exploratory_posthoc": true,
+    "human_annotated": false,
+    "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+    "original_diagnostic_codes": [],
+    "original_protocol_valid": true,
+    "phase_selection": {
+      "adapter_version": "phase_aware_posthoc_v1",
+      "commentary_count": 0,
+      "discarded_commentary_indices": [],
+      "exploratory_posthoc": true,
+      "final_answer_count": 0,
+      "message_count": 1,
+      "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+      "selected_output_index": 0,
+      "selection_mode": "single_unphased"
+    },
+    "prediction": {
+      "actions": [
+        {
+          "end_id": "F0:L0038",
+          "execution_role": "instruction",
+          "operation": "command.exec",
+          "reason": "Shell script uses curl to fetch content from a URL, reading HTTP headers and body for markdown or HTML extraction.",
+          "resource": "curl command-line tool",
+          "start_id": "F0:L0034"
+        },
+        {
+          "end_id": "F0:L0043",
+          "execution_role": "instruction",
+          "operation": "command.exec",
+          "reason": "Shell pipeline uses curl and html2markdown to convert HTML content to markdown using CSS selectors for inclusion and exclusion.",
+          "resource": "html2markdown command-line tool",
+          "start_id": "F0:L0040"
+        },
+        {
+          "end_id": "F0:L0086",
+          "execution_role": "instruction",
+          "operation": "command.exec",
+          "reason": "Shell command runs a Bun script fetch.ts to fetch and convert web content to markdown as a fallback when selectors fail.",
+          "resource": "bun runtime executing fetch.ts script",
+          "start_id": "F0:L0086"
+        },
+        {
+          "end_id": "F1:L0015",
+          "execution_role": "source_code",
+          "operation": "network.get",
+          "reason": "fetch.ts script performs HTTP GET request to the provided URL with a custom User-Agent header.",
+          "resource": "url from process.argv[2]",
+          "start_id": "F1:L0010"
+        },
+        {
+          "end_id": "F1:L0022",
+          "execution_role": "source_code",
+          "operation": "unknown",
+          "reason": "Reads response body text from the HTTP response for further processing.",
+          "resource": "unknown",
+          "start_id": "F1:L0021"
+        },
+        {
+          "end_id": "F1:L0069",
+          "execution_role": "source_code",
+          "operation": "unknown",
+          "reason": "Removes navigation and UI elements from the selected content element in the DOM before markdown conversion.",
+          "resource": "DOM elements matching selectors like nav, header, footer, script, style, etc.",
+          "start_id": "F1:L0052"
+        },
+        {
+          "end_id": "F1:L0123",
+          "execution_role": "source_code",
+          "operation": "unknown",
+          "reason": "Converts cleaned HTML content element innerHTML to markdown using TurndownService with custom rules.",
+          "resource": "contentEl.innerHTML",
+          "start_id": "F1:L0072"
+        },
+        {
+          "end_id": "F1:L0142",
+          "execution_role": "source_code",
+          "operation": "unknown",
+          "reason": "Outputs the final markdown content with a title extracted from the document.",
+          "resource": "console output",
+          "start_id": "F1:L0139"
+        }
+      ]
+    },
+    "protocol_valid": true,
+    "protocol_version": "phase4-discovery-line-id-v1",
+    "repairs_protocol": "phase4-discovery-v1",
+    "schema_errors": [],
+    "semantic_validity": "unverified",
+    "source_anchored": true,
+    "source_executed": false,
+    "source_sha256": {
+      "SKILL.md": "e5ffcd7285012fda259785da77851b1bc3eccbf3d4632125cd1c97508224e12d",
+      "fetch.ts": "c184f2e49da91ae9d423e9ec821bcf86d633469dbb52fe55c5a903f741549ed0"
+    },
+    "text": "{\"actions\":[{\"end_id\":\"F0:L0038\",\"execution_role\":\"instruction\",\"operation\":\"command.exec\",\"reason\":\"Shell script uses curl to fetch content from a URL, reading HTTP headers and body for markdown or HTML extraction.\" ,\"resource\":\"curl command-line tool\",\"start_id\":\"F0:L0034\"},{\"end_id\":\"F0:L0043\",\"execution_role\":\"instruction\",\"operation\":\"command.exec\",\"reason\":\"Shell pipeline uses curl and html2markdown to convert HTML content to markdown using CSS selectors for inclusion and exclusion.\" ,\"resource\":\"html2markdown command-line tool\",\"start_id\":\"F0:L0040\"},{\"end_id\":\"F0:L0086\",\"execution_role\":\"instruction\",\"operation\":\"command.exec\",\"reason\":\"Shell command runs a Bun script fetch.ts to fetch and convert web content to markdown as a fallback when selectors fail.\" ,\"resource\":\"bun runtime executing fetch.ts script\",\"start_id\":\"F0:L0086\"},{\"end_id\":\"F1:L0015\",\"execution_role\":\"source_code\",\"operation\":\"network.get\",\"reason\":\"fetch.ts script performs HTTP GET request to the provided URL with a custom User-Agent header.\" ,\"resource\":\"url from process.argv[2]\",\"start_id\":\"F1:L0010\"},{\"end_id\":\"F1:L0022\",\"execution_role\":\"source_code\",\"operation\":\"unknown\",\"reason\":\"Reads response body text from the HTTP response for further processing.\" ,\"resource\":\"unknown\",\"start_id\":\"F1:L0021\"},{\"end_id\":\"F1:L0069\",\"execution_role\":\"source_code\",\"operation\":\"unknown\",\"reason\":\"Removes navigation and UI elements from the selected content element in the DOM before markdown conversion.\" ,\"resource\":\"DOM elements matching selectors like nav, header, footer, script, style, etc.\",\"start_id\":\"F1:L0052\"},{\"end_id\":\"F1:L0123\",\"execution_role\":\"source_code\",\"operation\":\"unknown\",\"reason\":\"Converts cleaned HTML content element innerHTML to markdown using TurndownService with custom rules.\" ,\"resource\":\"contentEl.innerHTML\",\"start_id\":\"F1:L0072\"},{\"end_id\":\"F1:L0142\",\"execution_role\":\"source_code\",\"operation\":\"unknown\",\"reason\":\"Outputs the final markdown content with a title extracted from the document.\" ,\"resource\":\"console output\",\"start_id\":\"F1:L0139\"}]}"
+  },
+  "raw_ref": "results/phase4_discovery_followup/api/raw/99b2bc4d34b7947a358e1d1d6fed188ac6e3025a660867ff7d897be5c200d03b.json",
+  "raw_status": "completed",
+  "request_hash": "99b2bc4d34b7947a358e1d1d6fed188ac6e3025a660867ff7d897be5c200d03b",
+  "source_id": "s_14ee321036d704c2",
+  "split": "development",
+  "track": "discovery_followup",
+  "usage": {
+    "input_tokens": 8657,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 472,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 9129
+  },
+  "view": "line_ids"
+}

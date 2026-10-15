@@ -1,0 +1,151 @@
+{
+  "case_id": "real-68473eb9f3c45df4",
+  "context": "nonexecuting_candidate_discovery",
+  "elapsed_seconds": 14.88932339999883,
+  "family": "family-9c107c34dd5c3c90",
+  "job_id": "discovery-real-68473eb9f3c45df4-gpt-4.1-mini",
+  "model": "gpt-4.1-mini",
+  "parsed": {
+    "actions": [],
+    "analysis_registration": "prospective_phase4_exploratory_discovery",
+    "coverage_complete": false,
+    "diagnostic_codes": [
+      "SOURCE_EXCERPT_MISMATCH",
+      "SOURCE_SPAN_INVALID"
+    ],
+    "exploratory_discovery": true,
+    "exploratory_posthoc": false,
+    "human_annotated": false,
+    "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+    "original_diagnostic_codes": [],
+    "original_protocol_valid": true,
+    "phase_adapter": {
+      "implementation_module": "tsg.phase_protocol_v3",
+      "original_exploratory_posthoc": true,
+      "phase_selection": {
+        "adapter_version": "phase_aware_posthoc_v1",
+        "commentary_count": 0,
+        "discarded_commentary_indices": [],
+        "exploratory_posthoc": true,
+        "final_answer_count": 0,
+        "message_count": 1,
+        "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+        "selected_output_index": 0,
+        "selection_mode": "single_unphased"
+      }
+    },
+    "phase_selection": {
+      "adapter_version": "phase_aware_posthoc_v1",
+      "commentary_count": 0,
+      "discarded_commentary_indices": [],
+      "final_answer_count": 0,
+      "message_count": 1,
+      "official_source": "https://developers.openai.com/api/docs/guides/reasoning#phase-parameter",
+      "selected_output_index": 0,
+      "selection_mode": "single_unphased"
+    },
+    "prediction": {
+      "actions": [
+        {
+          "excerpt": "### Step 0: Address Resolution\n\nWhen the user does NOT provide a wallet address, resolve it automatically from the Agentic Wallet **before** running any defi command:\n\n```\n1. onchainos wallet status          → check if logged in, get active account\n2. onchainos wallet addresses       → get addresses grouped by chain category:\n                                       - XLayer addresses\n                                       - EVM addresses (Ethereum, BSC, Polygon, etc.)\n                                       - Solana addresses\n3. Match address to target chain:\n   - EVM chains → use EVM address\n   - Solana     → use Solana address\n   - XLayer     → use XLayer address\n```\n\nRules:\n- If the user provides an explicit address, use it directly — skip this step\n- If wallet is not logged in, ask the user to log in first (→ `okx-agentic-wallet`) or provide an address manually\n- If the user says \"check all accounts\" or \"all wallets\", use `wallet balance --all` to get all account IDs, then `wallet switch <id>` + `wallet addresses` for each account\n- Always confirm the resolved address with the user before proceeding if the account has multiple addresses of the same type",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 172,
+          "line_start": 153,
+          "operation": "command.exec",
+          "reason": "Describes automatic wallet address resolution by executing wallet status, addresses, balance, and switch commands to obtain and confirm user addresses before DeFi commands.",
+          "resource": "onchainos wallet status, onchainos wallet addresses, onchainos wallet balance --all, onchainos wallet switch <id>"
+        },
+        {
+          "excerpt": "5. Check wallet balance (okx-agentic-wallet) → if insufficient, warn user and stop\n6. defi invest --investment-id <id> --address <addr> --token USDC --amount 100000000\n   → CLI returns calldata (APPROVE + DEPOSIT steps)\n7. User signs and broadcasts each step in order\n```\n\n> **Token decimal**: Get `tokenAddress` from `defi detail` → `underlyingToken[].tokenAddress`, then use `token search --query <tokenAddress>` to get `decimal`. Same approach as DEX swap.\n>\n> **CRITICAL — Balance check is REQUIRED before calling `defi invest`.** You MUST call `okx-agentic-wallet` to verify the user has sufficient balance of the deposit token BEFORE generating calldata. If balance is insufficient, STOP and warn the user. Do NOT proceed to `defi invest` without confirming balance. Skipping this step wastes gas and results in failed on-chain transactions.",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 204,
+          "line_start": 196,
+          "operation": "command.exec",
+          "reason": "Balance check via okx-agentic-wallet is required before defi invest command to ensure sufficient funds; invest returns unsigned calldata for user signing and broadcasting.",
+          "resource": "okx-agentic-wallet wallet balance, defi invest"
+        },
+        {
+          "excerpt": "> **CRITICAL — position-detail is MANDATORY before withdraw.** You MUST call `defi position-detail` immediately before every `defi withdraw`, even if you already have position data from a previous call. Do NOT reuse stale position-detail results.\n\n```\n1. defi positions --address <addr> --chains ethereum\n2. defi position-detail --address <addr> --chain ethereum --platform-id <pid>\n   → MUST be called fresh — get investmentId, tokenPrecision, coinAmount (current balance)\n3. Full exit:\n   defi withdraw --investment-id <id> --address <addr> --chain ethereum --ratio 1 --platform-id <pid>\n   Partial exit (convert coinAmount to minimal units: amount × 10^tokenPrecision):\n   defi withdraw --investment-id <id> --address <addr> --chain ethereum --amount <minimal_units> --platform-id <pid>\n4. User signs and broadcasts\n```\n\n> **Partial exit --amount**: position-detail returns `coinAmount` in human-readable (e.g. \"2.3792\") and `tokenPrecision` (e.g. 6). Convert to minimal units: `floor(2.3792 × 10^6) = 2379200` → `--amount 2379200`.",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 230,
+          "line_start": 217,
+          "operation": "command.exec",
+          "reason": "Withdraw flow requires fresh position-detail call before defi withdraw command; withdraw returns unsigned calldata for user signing and broadcasting.",
+          "resource": "defi positions, defi position-detail, defi withdraw"
+        },
+        {
+          "excerpt": "\n> **CRITICAL — position-detail is MANDATORY before collect.** You MUST call `defi position-detail` immediately before every `defi collect`, even if you already have position data from a previous call in the conversation. Position data (rewards, investmentId, platformId, tokenId) changes after each on-chain operation (withdraw, previous collect, etc.), so stale data leads to wrong parameters or failed transactions. Do NOT skip this step. Do NOT reuse position-detail results from earlier in the conversation.\n\n```\n1. defi positions --address <addr> --chains ethereum\n2. defi position-detail --address <addr> --chain ethereum --platform-id <pid>\n   → MUST be called fresh — do NOT reuse prior results\n3. defi collect --address <addr> --chain ethereum --reward-type REWARD_INVESTMENT --investment-id <id> --platform-id <pid>\n   → CLI returns calldata (or skips if no rewards)\n4. User signs and broadcasts\n```\n",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 256,
+          "line_start": 243,
+          "operation": "command.exec",
+          "reason": "Claim rewards flow requires fresh position-detail call before defi collect command; collect returns unsigned calldata for user signing and broadcasting.",
+          "resource": "defi positions, defi position-detail, defi collect"
+        },
+        {
+          "excerpt": "5. Check wallet balance (okx-agentic-wallet) → if insufficient, warn user and stop\n6. defi invest --investment-id <id> --address <addr> --token USDT --amount 100000000 --range 5\n   → CLI handles calculate-entry internally, returns calldata\n7. User signs and broadcasts\n```\n\n### View Chart Data\n\nUse chart commands to analyze product trends before investing or to monitor existing positions.",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 293,
+          "line_start": 282,
+          "operation": "command.exec",
+          "reason": "Balance check via okx-agentic-wallet before V3 pool invest command; invest returns unsigned calldata for user signing and broadcasting.",
+          "resource": "okx-agentic-wallet wallet balance, defi invest"
+        },
+        {
+          "excerpt": "After `invest`/`withdraw`/`collect` returns `dataList`, execute each step via one of two paths:\n\n**Path A (user-provided wallet)**: user signs externally → broadcast via gateway\n```bash\n# For each dataList step:\n# 1. User signs the tx externally using dataList[N].to, dataList[N].serializedData, dataList[N].value\n# 2. Broadcast:\nonchainos gateway broadcast --signed-tx <signed_hex> --address <addr> --chain <chain>\n# 3. Poll until confirmed:\nonchainos gateway orders --address <addr> --chain <chain> --order-id <orderId>\n# → wait for txStatus=2, then proceed to next step\n```\n\n**Path B (Agentic Wallet)**: sign & broadcast via `wallet contract-call`\n\nEVM chains (Ethereum, BSC, Polygon, Arbitrum, Base, etc.):\n```bash\nonchainos wallet contract-call \\\n  --to <dataList[N].to> \\\n  --chain <chainIndex> \\\n  --input-data <dataList[N].serializedData> \\\n  --value <value_in_UI_units> \\\n  --biz-type defi\n```\n\nEVM (XLayer):\n```bash\nonchainos wallet contract-call \\\n  --to <dataList[N].to> \\\n  --chain 196 \\\n  --input-data <dataList[N].serializedData> \\\n  --value <value_in_UI_units> \\\n  --biz-type defi\n```\n\nSolana:\n```bash\nonchainos wallet contract-call \\\n  --to <dataList[N].to> \\\n  --chain 501 \\\n  --unsigned-tx <dataList[N].serializedData> \\\n  --biz-type defi\n```\n\n`contract-call` handles TEE signing and broadcasting internally — no separate broadcast step needed.\n\n**`--value` unit conversion**: `dataList[].value` is in minimal units (wei). `contract-call --value` expects UI units. Convert: `value_UI = value / 10^nativeToken.decimal` (e.g. 18 for ETH/POL, 9 for SOL). If `value` is `\"\"`, `\"0\"`, or `\"0x0\"`, use `\"0\"`.\n\n**`--chain` mapping**: `contract-call` and `gateway broadcast` require `realChainIndex` (e.g. `1`=Ethereum, `137`=Polygon, `56`=BSC, `501`=Solana, `196`=XLayer).\n\n**Execution rul",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 335,
+          "line_start": 312,
+          "operation": "command.exec",
+          "reason": "Describes two execution paths for signing and broadcasting transactions: external user signing with gateway broadcast and polling, or Agentic Wallet contract-call with internal TEE signing and broadcasting.",
+          "resource": "onchainos gateway broadcast, onchainos gateway orders, onchainos wallet contract-call"
+        },
+        {
+          "excerpt": "## Error Codes\n\n| Code | Scenario | Handling |\n|------|----------|----------|\n| 84400 | Parameter null | Check required params — partial exit needs `--amount` or `--ratio` |\n| 84021 | Asset syncing | \"Position data is syncing, please retry shortly\" |\n| 84023 | Invalid expectOutputList | CLI auto-constructs from position-detail; retry or pass `--platform-id` |\n| 84014 | Balance check failed | Insufficient balance — check with `okx-agentic-wallet` |\n| 84018 | Balancing failed | V3 balancing failed — adjust price range or increase slippage |\n| 84010 | Token not supported | Check supported tokens via `defi detail` |\n| 84001 | Platform not supported | DeFi platform not supported |\n| 84016 | Contract execution failed | Check parameters and retry |\n| 84019 | Address format mismatch | Address format invalid for this chain |\n| 50011 | Rate limit | Wait and retry |",
+          "execution_role": "source_code",
+          "file": "SKILL.md",
+          "line_end": 379,
+          "line_start": 370,
+          "operation": "unknown",
+          "reason": "Lists error codes and scenarios related to DeFi commands, including balance check failure and address format mismatch, indicating validation and error handling but no direct privileged action.",
+          "resource": "unknown"
+        }
+      ]
+    },
+    "protocol_valid": false,
+    "protocol_version": "phase4-discovery-v1",
+    "schema_errors": [],
+    "semantic_validity": "unverified",
+    "source_anchored": false,
+    "source_executed": false,
+    "source_sha256": {
+      "SKILL.md": "615d9dc0dc54a87a519cf364bd88bdbcb61894cf7e970b57adf008c3f5f9b63a",
+      "references/cli-reference.md": "e1fcebb68b50b243aa3fccaf948d07dcb7bacf525a0470260a0ccc72185cd06b"
+    },
+    "text": "{\"actions\":[{\"file\":\"SKILL.md\",\"line_start\":153,\"line_end\":172,\"excerpt\":\"### Step 0: Address Resolution\\n\\nWhen the user does NOT provide a wallet address, resolve it automatically from the Agentic Wallet **before** running any defi command:\\n\\n```\\n1. onchainos wallet status          → check if logged in, get active account\\n2. onchainos wallet addresses       → get addresses grouped by chain category:\\n                                       - XLayer addresses\\n                                       - EVM addresses (Ethereum, BSC, Polygon, etc.)\\n                                       - Solana addresses\\n3. Match address to target chain:\\n   - EVM chains → use EVM address\\n   - Solana     → use Solana address\\n   - XLayer     → use XLayer address\\n```\\n\\nRules:\\n- If the user provides an explicit address, use it directly — skip this step\\n- If wallet is not logged in, ask the user to log in first (→ `okx-agentic-wallet`) or provide an address manually\\n- If the user says \\\"check all accounts\\\" or \\\"all wallets\\\", use `wallet balance --all` to get all account IDs, then `wallet switch <id>` + `wallet addresses` for each account\\n- Always confirm the resolved address with the user before proceeding if the account has multiple addresses of the same type\",\"operation\":\"command.exec\",\"resource\":\"onchainos wallet status, onchainos wallet addresses, onchainos wallet balance --all, onchainos wallet switch <id>\",\"execution_role\":\"source_code\",\"reason\":\"Describes automatic wallet address resolution by executing wallet status, addresses, balance, and switch commands to obtain and confirm user addresses before DeFi commands.\"},{\"file\":\"SKILL.md\",\"line_start\":196,\"line_end\":204,\"excerpt\":\"5. Check wallet balance (okx-agentic-wallet) → if insufficient, warn user and stop\\n6. defi invest --investment-id <id> --address <addr> --token USDC --amount 100000000\\n   → CLI returns calldata (APPROVE + DEPOSIT steps)\\n7. User signs and broadcasts each step in order\\n```\\n\\n> **Token decimal**: Get `tokenAddress` from `defi detail` → `underlyingToken[].tokenAddress`, then use `token search --query <tokenAddress>` to get `decimal`. Same approach as DEX swap.\\n>\\n> **CRITICAL — Balance check is REQUIRED before calling `defi invest`.** You MUST call `okx-agentic-wallet` to verify the user has sufficient balance of the deposit token BEFORE generating calldata. If balance is insufficient, STOP and warn the user. Do NOT proceed to `defi invest` without confirming balance. Skipping this step wastes gas and results in failed on-chain transactions.\",\"operation\":\"command.exec\",\"resource\":\"okx-agentic-wallet wallet balance, defi invest\",\"execution_role\":\"source_code\",\"reason\":\"Balance check via okx-agentic-wallet is required before defi invest command to ensure sufficient funds; invest returns unsigned calldata for user signing and broadcasting.\"},{\"file\":\"SKILL.md\",\"line_start\":217,\"line_end\":230,\"excerpt\":\"> **CRITICAL — position-detail is MANDATORY before withdraw.** You MUST call `defi position-detail` immediately before every `defi withdraw`, even if you already have position data from a previous call. Do NOT reuse stale position-detail results.\\n\\n```\\n1. defi positions --address <addr> --chains ethereum\\n2. defi position-detail --address <addr> --chain ethereum --platform-id <pid>\\n   → MUST be called fresh — get investmentId, tokenPrecision, coinAmount (current balance)\\n3. Full exit:\\n   defi withdraw --investment-id <id> --address <addr> --chain ethereum --ratio 1 --platform-id <pid>\\n   Partial exit (convert coinAmount to minimal units: amount × 10^tokenPrecision):\\n   defi withdraw --investment-id <id> --address <addr> --chain ethereum --amount <minimal_units> --platform-id <pid>\\n4. User signs and broadcasts\\n```\\n\\n> **Partial exit --amount**: position-detail returns `coinAmount` in human-readable (e.g. \\\"2.3792\\\") and `tokenPrecision` (e.g. 6). Convert to minimal units: `floor(2.3792 × 10^6) = 2379200` → `--amount 2379200`.\",\"operation\":\"command.exec\",\"resource\":\"defi positions, defi position-detail, defi withdraw\",\"execution_role\":\"source_code\",\"reason\":\"Withdraw flow requires fresh position-detail call before defi withdraw command; withdraw returns unsigned calldata for user signing and broadcasting.\"},{\"file\":\"SKILL.md\",\"line_start\":243,\"line_end\":256,\"excerpt\":\"\\n> **CRITICAL — position-detail is MANDATORY before collect.** You MUST call `defi position-detail` immediately before every `defi collect`, even if you already have position data from a previous call in the conversation. Position data (rewards, investmentId, platformId, tokenId) changes after each on-chain operation (withdraw, previous collect, etc.), so stale data leads to wrong parameters or failed transactions. Do NOT skip this step. Do NOT reuse position-detail results from earlier in the conversation.\\n\\n```\\n1. defi positions --address <addr> --chains ethereum\\n2. defi position-detail --address <addr> --chain ethereum --platform-id <pid>\\n   → MUST be called fresh — do NOT reuse prior results\\n3. defi collect --address <addr> --chain ethereum --reward-type REWARD_INVESTMENT --investment-id <id> --platform-id <pid>\\n   → CLI returns calldata (or skips if no rewards)\\n4. User signs and broadcasts\\n```\\n\",\"operation\":\"command.exec\",\"resource\":\"defi positions, defi position-detail, defi collect\",\"execution_role\":\"source_code\",\"reason\":\"Claim rewards flow requires fresh position-detail call before defi collect command; collect returns unsigned calldata for user signing and broadcasting.\"},{\"file\":\"SKILL.md\",\"line_start\":282,\"line_end\":293,\"excerpt\":\"5. Check wallet balance (okx-agentic-wallet) → if insufficient, warn user and stop\\n6. defi invest --investment-id <id> --address <addr> --token USDT --amount 100000000 --range 5\\n   → CLI handles calculate-entry internally, returns calldata\\n7. User signs and broadcasts\\n```\\n\\n### View Chart Data\\n\\nUse chart commands to analyze product trends before investing or to monitor existing positions.\",\"operation\":\"command.exec\",\"resource\":\"okx-agentic-wallet wallet balance, defi invest\",\"execution_role\":\"source_code\",\"reason\":\"Balance check via okx-agentic-wallet before V3 pool invest command; invest returns unsigned calldata for user signing and broadcasting.\"},{\"file\":\"SKILL.md\",\"line_start\":312,\"line_end\":335,\"excerpt\":\"After `invest`/`withdraw`/`collect` returns `dataList`, execute each step via one of two paths:\\n\\n**Path A (user-provided wallet)**: user signs externally → broadcast via gateway\\n```bash\\n# For each dataList step:\\n# 1. User signs the tx externally using dataList[N].to, dataList[N].serializedData, dataList[N].value\\n# 2. Broadcast:\\nonchainos gateway broadcast --signed-tx <signed_hex> --address <addr> --chain <chain>\\n# 3. Poll until confirmed:\\nonchainos gateway orders --address <addr> --chain <chain> --order-id <orderId>\\n# → wait for txStatus=2, then proceed to next step\\n```\\n\\n**Path B (Agentic Wallet)**: sign & broadcast via `wallet contract-call`\\n\\nEVM chains (Ethereum, BSC, Polygon, Arbitrum, Base, etc.):\\n```bash\\nonchainos wallet contract-call \\\\\\n  --to <dataList[N].to> \\\\\\n  --chain <chainIndex> \\\\\\n  --input-data <dataList[N].serializedData> \\\\\\n  --value <value_in_UI_units> \\\\\\n  --biz-type defi\\n```\\n\\nEVM (XLayer):\\n```bash\\nonchainos wallet contract-call \\\\\\n  --to <dataList[N].to> \\\\\\n  --chain 196 \\\\\\n  --input-data <dataList[N].serializedData> \\\\\\n  --value <value_in_UI_units> \\\\\\n  --biz-type defi\\n```\\n\\nSolana:\\n```bash\\nonchainos wallet contract-call \\\\\\n  --to <dataList[N].to> \\\\\\n  --chain 501 \\\\\\n  --unsigned-tx <dataList[N].serializedData> \\\\\\n  --biz-type defi\\n```\\n\\n`contract-call` handles TEE signing and broadcasting internally — no separate broadcast step needed.\\n\\n**`--value` unit conversion**: `dataList[].value` is in minimal units (wei). `contract-call --value` expects UI units. Convert: `value_UI = value / 10^nativeToken.decimal` (e.g. 18 for ETH/POL, 9 for SOL). If `value` is `\\\"\\\"`, `\\\"0\\\"`, or `\\\"0x0\\\"`, use `\\\"0\\\"`.\\n\\n**`--chain` mapping**: `contract-call` and `gateway broadcast` require `realChainIndex` (e.g. `1`=Ethereum, `137`=Polygon, `56`=BSC, `501`=Solana, `196`=XLayer).\\n\\n**Execution rul\",\"operation\":\"command.exec\",\"resource\":\"onchainos gateway broadcast, onchainos gateway orders, onchainos wallet contract-call\",\"execution_role\":\"source_code\",\"reason\":\"Describes two execution paths for signing and broadcasting transactions: external user signing with gateway broadcast and polling, or Agentic Wallet contract-call with internal TEE signing and broadcasting.\"},{\"file\":\"SKILL.md\",\"line_start\":370,\"line_end\":379,\"excerpt\":\"## Error Codes\\n\\n| Code | Scenario | Handling |\\n|------|----------|----------|\\n| 84400 | Parameter null | Check required params — partial exit needs `--amount` or `--ratio` |\\n| 84021 | Asset syncing | \\\"Position data is syncing, please retry shortly\\\" |\\n| 84023 | Invalid expectOutputList | CLI auto-constructs from position-detail; retry or pass `--platform-id` |\\n| 84014 | Balance check failed | Insufficient balance — check with `okx-agentic-wallet` |\\n| 84018 | Balancing failed | V3 balancing failed — adjust price range or increase slippage |\\n| 84010 | Token not supported | Check supported tokens via `defi detail` |\\n| 84001 | Platform not supported | DeFi platform not supported |\\n| 84016 | Contract execution failed | Check parameters and retry |\\n| 84019 | Address format mismatch | Address format invalid for this chain |\\n| 50011 | Rate limit | Wait and retry |\",\"operation\":\"unknown\",\"resource\":\"unknown\",\"execution_role\":\"source_code\",\"reason\":\"Lists error codes and scenarios related to DeFi commands, including balance check failure and address format mismatch, indicating validation and error handling but no direct privileged action.\"}]}"
+  },
+  "raw_ref": "results/phase4/api/raw/bfad756fd5d1d5ab7c88f16e9333c828f975f262f679b61edfec582421ede33f.json",
+  "raw_status": "completed",
+  "request_hash": "bfad756fd5d1d5ab7c88f16e9333c828f975f262f679b61edfec582421ede33f",
+  "split": "development",
+  "track": "discovery",
+  "usage": {
+    "input_tokens": 7653,
+    "input_tokens_details": {
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "output_tokens": 2420,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 10073
+  },
+  "view": "raw"
+}
