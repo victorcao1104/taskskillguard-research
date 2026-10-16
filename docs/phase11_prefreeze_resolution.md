@@ -1,0 +1,33 @@
+# Phase 11 pre-freeze review resolution
+
+Date: 2026-10-17. **Verdict: the four blockers recorded in `phase11_prefreeze_review.md` are resolved for production freeze.** The reviewed design is suitable to proceed to a local prospective freeze and subsequent independent validation/acquisition under its stated synthetic, descriptive scope. This is not a certification of unseen heldout data, API outcomes, release integrity, or publication novelty. The original review is retained unchanged.
+
+## Scope and verification
+
+Read the revised design, new `phase11_analysis_plan.md`, `phase11_common.py`, `run_phase11.py`, `experiment_phase11.py`, and acquisition tests. No heldout/challenge generator, data, reference tests, or withheld first-pass directory was read. No API or Git operation was performed. Production files and historical raw files were not changed by this reviewer.
+
+The same five non-reference test files used in the original review now pass **148 tests in 1.29s**, using `.venv/Scripts/python.exe -m pytest tests/test_certificate_v11.py tests/test_certificate_theorems_v11.py tests/test_commit_v11.py tests/test_protocol_v11.py tests/test_acquisition_v11.py --basetemp work/p11-freshreview-resolution -q -p no:cacheprovider`.
+
+Additional synthetic-only checks constructed 36 distinct toy families: `build_specs` and `validate_specs` accepted 288 streams with 288 unique stream IDs and replicate IDs. The new experiment `policy_record` executed 40 toy conditions (four policies, five budgets, fixed/online); all 40 returned verified positive certificates and no fault-free execution failures. These are interface checks, not benchmark results.
+
+## Resolution of original findings
+
+1. **Prospective analysis and missing freeze inputs: resolved.** The analysis plan now fixes the cohorts, deterministic grids, primary observe_cover comparator, budgets, failure/missingness handling, matched-prefix interpretation, recovery denominator, family weighting, and descriptive bootstrap procedure. `experiment_phase11.py` exists and performs the main deterministic and integrated grids. Mandatory freeze inputs include both the experiment file and analysis plan, so their absence cannot silently disappear through a glob. Summary/figure code may be written later only as an implementation of this frozen contract; new choices must be identified as exploratory amendments. The design's final analysis paragraph was also aligned with observe_cover and descriptive-only intervals during this re-review.
+
+2. **Pre-I/O rejection counted as a provider request: resolved.** `summarize_streams` distinguishes decision attempts, provider-or-uncertain requests, confirmed response statuses, uncertain transport/interruption, and pre-I/O budget rejections. The new regression test verifies that one rejected decision contributes zero provider-or-uncertain requests. Keep these labels in every downstream table: `provider_or_uncertain_requests` is not an exact observed-send count, and an interrupted intent does not establish provider contact. Unknown usage remains a conservative estimate, not an invoice.
+
+3. **Family grid validation: resolved for the actual construction path.** `validate_specs` requires 288 rows, 36 distinct selected cases, 36 distinct families, and one selected case per family. `build_specs` constructs the full two-model/four-cell grid for each selected case and unique deterministic replicate IDs. The new duplicate-family rejection test plus the successful synthetic 36-family construction address the original counterexample. This conclusion concerns the composed `build_specs` → `validate_specs` pipeline; the validator alone is not a general validator for arbitrary externally authored stream rows.
+
+4. **Deterministic-scheduling claim under shared cap: resolved by narrowing the claim.** The design and manifest now state fixed hash-sorted submission with four workers and completion-dependent subsequent requests. They explicitly retain cap-censored cells and require disclosure of affected families/cells and latency-dependent censoring. The analysis contract treats comparisons as descriptive and preserves failed/partial streams. No unverified assertion that the full grid fits inside the cap is needed for this resolution. If censoring occurs, its asymmetry and effect on comparability must be prominent in results; reporting it does not make missingness random.
+
+## Expanded challenge cohort
+
+The revised total is 72 cases in 36 families: the original 48-case/24-family cohort plus a separate 24-case/12-family challenge cohort, each with two lexical variants; dependent scaling siblings remain separate. The API grid selects one variant from each family, giving `36 × 2 models × 4 cells = 288` streams. The effective family sample sizes remain 24 and 12 by cohort, or 36 in the labelled equal-family aggregate, never 288 independent observations.
+
+The supplement was commissioned after an aggregate-only audit disclosed that feasible fully observed classes in the original cohort were singletons, and before model outcomes. That is a transparent, data-informed pre-model-outcome design amendment. It should not be described as a benchmark wholly specified before any data inspection. The original first-pass cohort must remain intact, the supplement's separate authoring/hash chronology must be preserved, and main/challenge results must be reported separately as promised. The new plan satisfies these reporting obligations prospectively; this reviewer has not independently inspected or verified either cohort.
+
+The extension addresses a stated coverage limitation without establishing representativeness, statistical power, or novelty. Deliberately added multiworld and no-savings examples make a useful challenge stratum, not an unbiased population sample. Elementary certificate theory and established completion/fencing mechanisms retain the bounded contribution described in the original review.
+
+## Remaining downstream gates
+
+No unresolved pre-freeze blocker was found in this re-review. Before publication, verify independent-reference agreement and chronology, complete call/ledger accounting, certificate checking at execution integration points, family/cohort aggregation including censored and failed cases, heldout assumption counterexamples, original-file hashes, isolated replay, exact-commit CI, and correspondence between the frozen contract and reported tables. The inherited certificate/commit/protocol limitations in the original review still apply. Passing the present tests is not evidence for unseen benchmark performance or a real deployed security guarantee.

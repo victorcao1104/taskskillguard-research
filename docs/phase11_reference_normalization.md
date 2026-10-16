@@ -1,0 +1,7 @@
+# Retained initial reference mismatch and typed-error reconciliation
+
+The first post-freeze comparison of 1,006 independent world/route executions found 1,004 exact error-code matches and two mismatches. Both are the original route in world0 of the two postgoal_unbound_tail variants. The independent evaluator reports `unbound_variable:unbound`; the production VM reports `unbound_variable`. Files, emitted values, complete common event traces, success/goal, entered steps, charged calls and receipt reuse match for both cases.
+
+The original `results/phase11/reference/agreement.jsonl`, `agreement_summary.json` and `mismatches.json` are retained unchanged. Neither interpreter, source case, truth file nor production freeze is modified. A separately saved normalized comparison maps only the independent error family `unbound_variable:<name>` to the production type `unbound_variable`; it does not map other errors or alter execution outcomes. It also uses the already declared normalization of completed-but-unsatisfied goal to the actual executor's `goal_unmet` terminal result.
+
+This is a reporting-schema difference, not an observed semantic success discrepancy. Claims about agreement must say normalized semantic agreement and disclose the two initial error-string differences. This reconciliation was made before API acquisition, after seeing independent validation outputs, and is not represented as part of the original frozen error-string comparison.

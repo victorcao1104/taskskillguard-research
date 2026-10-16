@@ -1,0 +1,26 @@
+name: Phase eleven executable evidence contract
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  phase11:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TIKTOKEN_CACHE_DIR: work/tiktoken
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies (networked setup)
+        run: python -m pip install -r configs/requirements-lock.txt -r configs/phase5-requirements.txt
+      - name: Install verified tokenizer cache (networked setup, no model API)
+        run: python -c "import tiktoken; tiktoken.get_encoding('o200k_base')"
+      - name: Restore byte-exact archived first-pass fixtures
+        run: python scripts/hydrate_phase11.py
+      - name: Run full test suite
+        run: python -m pytest -q --basetemp work/p11ci
+      - name: Replay and verify archived evidence without network or model API
+        run: python scripts/verify_phase11.py
