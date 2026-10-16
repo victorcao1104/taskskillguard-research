@@ -1,0 +1,36 @@
+# Phase 9: observation, query allocation and recovery
+
+Status: prospective local design; not an external preregistration. Pure synthetic finite DSL study. Existing results remain immutable. Parent checkpoint: `93eda0d23236912671c7b309eb78e7c80fd20db1`, remote tag `archive-phase8-20261016`.
+
+## Questions and claims
+
+1. Does resolving global uncertainty using bounded trusted observations improve authorized task completion, without giving the controller a hidden world index? Distinguish global label unknown, observation ambiguity, query-budget abstention, protocol invalidity, and unknown commit outcome.
+2. With identical interpreter query opportunities and budgets, does a model's query ordering improve proven typed decisions over deterministic heuristics and seeded random ordering? Does adding derived dependency edges improve query efficiency at equal information?
+3. Does receipt-aware preflight prevent irreversible contamination? What are the call, planning, modeled latency and ambiguous-commit tradeoffs under fault shifts and equal planning budgets?
+4. Which contributions come from removing duplicated facts, deterministic type reduction, supplying tool facts, and runtime preflight? Use factorial contrasts and report interaction/confounding limits.
+
+No claim of real Skill safety, general prompt-injection immunity, universal policy dominance, or independent samples from repeated conditions. Operational and unguarded causal semantics remain distinct.
+
+## Design
+
+- Hold out 24 new cases from 12 independently authored structural mechanisms, two variants each. Reference author may use only frozen independent truth and old datasets, not new production or model outcomes. Freeze production before materializing heldout. Keep all 72 Phase 8 cases as operational regression; new-model acquisition uses only the 24 new cases.
+- Reference checks: AST/site coverage, typed distribution and suppression/route execution differentials. Publish normalized AST distance and duplicate audits; variants are clustered by family and not independent mechanisms.
+- Factorial audit: four acquisitions per case/model: A00/A01/A10/A11 encode duplicate-global-facts versus global-once, and absence/presence of exact tool facts. Each response includes proposed facts and model labels. Score direct labels and deterministic reduction of the SAME facts, giving a 2 x 2 x 2 factorial without conflating reducer effects with separate calls. Tool-fact arms get extra computation and are attribution controls, not equal-capability baselines. Global inconsistency is a measured protocol failure, never repaired from truth.
+- Query arm: models rank a public list of atomic interpreter executions with source only (Q0) or source plus deterministically derived graph (Q1). Both have identical information. No query answer or full-solver result is available when ranking. Tool executes only selected queries; incremental labels are proof based. Compare heuristic and seeded random orders on the same budgets 2, 4, 8 and complete. Log actual invocations and interpreter work. This tests one-shot allocation, not adaptive active learning. Invalid rankings yield no model-directed queries and are counted explicitly.
+- Primary acquisition count: 24 x 2 models x (4 factorial + 2 query) = 288. No post-result prompt tuning or automatic retries. Fixed six-family subset repeats A10 and Q0 twice per model (48 requests) for total 336. Replicates assess stability, not independent sample size.
+- Runtime gate: aggregate conservative authorization control versus conditional authorization constrained by trusted bounded observations. The environment alone knows the actual world index. Hidden/non-observable distinctions cannot be inferred from it. Necessary observations are counted and unresolved cases stop or select a provably legal alternative. Any synthetic trusted observability assumptions are explicit.
+- Runtime factorial: gate aggregate/conditional x preflight off/on, plus calls/priority/risk selection under the same planner budget; cache off/on comparison. Preflight uses actual receipt, signature and idempotency semantics before first side effect. Mutation, quota and ambiguous outcome invariants retained. No grant expansion or receipt deletion.
+- Exact runtime grid: interface on all 96 cases, all declared worlds, quota 16, four faults (none/transient-before/known-after/double-transient), gate x preflight, calls policy, planner budget 512, observation budget 2, cache enabled. Add the unchanged v8 cost policy with aggregate solver gate. On new cases add observation budgets 0/1 for conditional+preflight. Recovery grid on NEW cases only: three policies x cache off/on x planning budgets 128/512 x seven fault schedules. Query integration on new cases: each primary model Q0/Q1, heuristic, and seeded random, query budgets 8/full, four interface faults, conditional gate+preflight; pass only paid original-query authorization evidence. Missing evidence stays missing; no free audit fills it. Separately account query, audit and planning costs.
+- Recovery fault grid includes no fault, transient-before, known-after, ambiguous-after, double-transient, and two explicitly registered mixed/late ambiguous schedules. Controllers observe only history, not future schedules. Risk score is a declared surrogate, not calibrated real failure probability. Latency is a modeled operation-weight metric, not wall-clock deployment latency.
+
+## Analysis and guardrails
+
+Report case/family denominators and typed counts. Primary contrasts on new families: conditional vs aggregate completion; preflight on vs off completion; Q1 vs Q0, model vs heuristic proven decisions at each budget; factorial main effects/interactions on typed correctness. Report macro-family paired mean and percentile bootstrap (10,000 resamples, seed 9009) for primary contrasts. Intervals are exploratory, correlated and unadjusted for multiplicity. Show losses as well as wins. Old/new comparisons use the exact same regression cases and clearly distinguish policy changes from distribution shifts.
+
+Keep invocation, planner steps, modeled latency, observation queries, ambiguous stops and invariants separate; do not collapse them into a favorable undocumented weight. Cache correctness must be tested under state, receipt, grant, gate and quota changes. Planning limits must count actual work, not hide full solving outside measured steps. Full solver is an exact finite upper reference, with measured cost.
+
+Frozen artifacts precede API dispatch; raw requests/responses, durable reservation intents, all failures and independent container replay are saved. Budget inherits the entire Phase 8 ledger: cumulative upper $16.992198050, cumulative cap $29.551575125, remaining $12.559377075. Campaign reservation ceiling $4, prices reverified before dispatch. Only gpt-6-luna and gpt-4.1-mini. No real Skill experiment or human annotation.
+
+## Archive and rollback
+
+The remote annotated tag `archive-phase8-20261016` points at the verified Phase 8 commit. To inspect or restore, create a separate checkout/branch from that tag; do not hard-reset a checkout with new work. Phase 9 additionally records hashes of every previously tracked file, and verifies them before publication. New work is on `study-v9`; all old code, documents and results remain byte-identical.
