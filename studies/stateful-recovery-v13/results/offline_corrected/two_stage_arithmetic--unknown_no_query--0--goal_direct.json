@@ -1,0 +1,216 @@
+{
+  "accepted": false,
+  "case_id": "two_stage_arithmetic--unknown_no_query--0",
+  "construction": {},
+  "deployed_program": [],
+  "elapsed_seconds": 0.03730379999615252,
+  "evaluation": {
+    "calls": 0,
+    "disclosure": false,
+    "duplicate_effects": 0,
+    "ordinary_complete": false,
+    "safe_complete": false,
+    "safe_world_fraction": 0.0,
+    "steps": 0,
+    "stop_codes": [],
+    "unauthorized": false,
+    "world_runs": 32
+  },
+  "final_evaluation_cost": {
+    "executions": 64,
+    "steps": 288,
+    "tool_calls": 128
+  },
+  "method": "goal_direct",
+  "model_calls": 0,
+  "program": [
+    {
+      "body": [
+        {
+          "op": "read",
+          "out": "v0",
+          "path": "/input/records"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "body": [
+        {
+          "op": "read",
+          "out": "right_input",
+          "path": "/input/lookup"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "left": "v0",
+      "on": "item",
+      "op": "join",
+      "out": "v1",
+      "right": "right_input"
+    },
+    {
+      "cmp": "gt",
+      "field": "qty",
+      "op": "filter",
+      "out": "v2",
+      "src": "v1",
+      "value": 1
+    },
+    {
+      "left": "qty",
+      "name": "gross",
+      "op": "derive",
+      "operator": "mul",
+      "out": "v3",
+      "right": "price",
+      "src": "v2"
+    },
+    {
+      "left": "gross",
+      "name": "net",
+      "op": "derive",
+      "operator": "sub",
+      "out": "v4",
+      "right": "unit_cost",
+      "src": "v3"
+    },
+    {
+      "group_by": [],
+      "metrics": [
+        {
+          "field": "net",
+          "name": "net_total",
+          "op": "sum"
+        },
+        {
+          "field": "item",
+          "name": "count",
+          "op": "count"
+        }
+      ],
+      "op": "aggregate",
+      "out": "v5",
+      "src": "v4"
+    },
+    {
+      "body": [
+        {
+          "op": "write",
+          "path": "/output/report",
+          "src": "v5"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "body": [
+        {
+          "delivery": "report",
+          "op": "status",
+          "out": "_receipt_1"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "else": [],
+      "equals": "not_sent",
+      "op": "if",
+      "then": [
+        {
+          "body": [
+            {
+              "delivery": "report",
+              "op": "send",
+              "src": "v5",
+              "to": "team"
+            }
+          ],
+          "op": "retry",
+          "retries": 2
+        }
+      ],
+      "var": "_receipt_1"
+    },
+    {
+      "body": [
+        {
+          "op": "delete",
+          "path": "/tmp/cache"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    }
+  ],
+  "search_cost": {
+    "executions": 20,
+    "steps": 177,
+    "tool_calls": 77
+  },
+  "search_cpu_seconds": 0.015625,
+  "search_seconds": 0.012981999985640869,
+  "trace_file": "two_stage_arithmetic--unknown_no_query--0--goal_direct.traces.json.gz",
+  "trace_sha256": "a7893fc0560cfc8c19b32aa557cd1d236e6c2e003b647a065ff9e09e96ed371c",
+  "unblocked_passthrough": false,
+  "validation": {
+    "accepted": false,
+    "counterexample": {
+      "code": "PRIVILEGE",
+      "input_index": 0,
+      "location": "8.0",
+      "operation": "status",
+      "target": "report",
+      "world": {
+        "secret": "A",
+        "unknown_committed": true
+      }
+    },
+    "elapsed_seconds": 0.0013089000131003559,
+    "steps": 13,
+    "world_runs": 1
+  },
+  "validation_attempts": [
+    {
+      "accepted": false,
+      "counterexample": {
+        "code": "PRIVILEGE",
+        "input_index": 0,
+        "location": "0.0",
+        "operation": "status",
+        "target": "report",
+        "world": {
+          "secret": "A",
+          "unknown_committed": true
+        }
+      },
+      "elapsed_seconds": 0.0009148000099230558,
+      "steps": 2,
+      "world_runs": 1
+    },
+    {
+      "accepted": false,
+      "counterexample": {
+        "code": "PRIVILEGE",
+        "input_index": 0,
+        "location": "8.0",
+        "operation": "status",
+        "target": "report",
+        "world": {
+          "secret": "A",
+          "unknown_committed": true
+        }
+      },
+      "elapsed_seconds": 0.0013089000131003559,
+      "steps": 13,
+      "world_runs": 1
+    }
+  ]
+}

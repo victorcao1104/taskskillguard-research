@@ -1,0 +1,77 @@
+\section{Methodology}
+\subsection{Task, Skill and Trust Boundary}
+We represent a Skill as its instruction text and a JSON helper program. Each released package has a \code{SKILL.md} file and a \code{scripts/main.json} file. The interpreter executes the helper's action list; it does not execute native code or parse unrestricted Skill formats. The instruction text is shown to source-aware model methods as untrusted material. Fresh replanning receives the trusted task and current observation without the original package. The package export and case representation are checked for equality in the artifact audit.
+
+A trusted task is a tuple $T=(Q,G,P,B)$. Here $Q$ describes the required table transformation, $G$ lists final obligations, $P$ gives exact operation--resource grants, and $B$ limits charged tool calls. The obligations require a report equal to $Q(x)$ for input $x$, one correct delivery to the named recipient, unchanged source tables, and removal of a named temporary file. The task language includes selection, joins, arithmetic, grouping, projection and sorting. A separate Python evaluator implements these requirements independently of the interpreter operations.
+
+The trusted boundary includes this task, the interpreter, the effect records and the verifier. The attacker can change the helper and its instructions, including its control flow, values and apparent prerequisites. It cannot change grants, rewrite the goal evaluator, falsify trusted receipts or modify the recovery tools. Both the original helper and generated continuations remain untrusted. These assumptions isolate recovery under correct authority; they do not solve natural-language authorization or incorrect policy generation.
+
+The language has sixteen operations: read, filter, project, sort, aggregate, join, derive, const, copy, concat, write, send, delete, status, if and retry. None is a task-specific replacement script. Effectful operations use exact resource names. The interpreter admits at most 32 actions per block and 192 executed steps per invocation. Read, write, send, delete and status consume the tool-call allowance, including denied attempts. Pure table operations consume steps but not tool calls. Retry can repeat a block up to twice after a confirmed transient failure with no effect; it cannot treat an unknown outcome as a failure.
+
+\subsection{Current State and Historical Effects}
+The runtime state stores files, labeled variables, delivered messages, receipts, call counts, fault positions and an execution trace. An operation can be unattempted, confirmed successful, confirmed failed without an effect, or uncertain. These states are not interchangeable. A successful send discharges its delivery obligation only if its recipient and content match the trusted goal. A confirmed wrong delivery is an irreversible barrier, not completed useful work.
+
+For an uncertain acknowledgement, the verifier considers both possible histories: the effect happened, or it did not. The model receives the same observation in both. The internal message store is not exposed. If the task permits a status query, the candidate can observe \code{sent} or \code{not\_sent} and branch accordingly. If there is no permitted distinguishing observation, the candidate must not assume the answer. In the corrected physical trace, an uncommitted prefix send is marked \code{not\_committed}; its attempt cost and unknown receipt remain. The earlier inconsistent representation and its impact on feedback are retained in the amendment audit.
+
+We use a strict once-only convention: no repeated successful send for a delivery identifier and no repeated successful write or delete for a resource. This is an explicit experimental policy, not a claim that every repeated file write is harmful in practice. It makes preservation of prior work measurable. The same rule is stated to every model. The runtime blocks duplicate sends using actual delivery state; the verifier also checks repeated writes and deletes. A denied attempt is distinguished from an executed unauthorized effect.
+
+\subsection{Residual Effect Contract}
+Let $H$ be the trusted execution history and $s_H$ its current state. The residual task contains obligations not already satisfied by verified state:
+\begin{equation}
+R(T,H)=\{g\in G: g\text{ is not established by }s_H\}.
+\end{equation}
+The implementation also records reusable result variables, confirmed deliveries, deliveries requiring a query, irreversible barriers and the remaining allowance $B-b(H)$. For a present report or cached result, equality with the independent task evaluator is required before it is considered reusable. This initial reuse check uses the observed input. The common verifier must still test the resulting continuation on other inputs; coincidental equality is not treated as a general proof.
+
+The contract is derived from the trusted task and state, not from the attacker's explanation. If the helper says that sending a report requires a credential, the credential read does not become an obligation. Source dependency analysis only identifies candidate variables and controls affected by forbidden reads. The implementation conservatively follows data uses and control dependencies. Secret-tainted values and secret-dependent state are not presented to the model as ordinary trusted observations.
+
+To avoid exposing information through absence, observations are merged across the two declared secret worlds. A file, variable or counter that differs is represented as secret-dependent. Both possible branches contribute labels for file presence or absence. This closes the specific absence bug retained in the earlier project version, but does not establish complete protection against all implicit channels. Only the declared values, state fields and public effect traces are checked.
+
+\subsection{Constructing a Continuation}
+The constructor applies four transformations. First, it removes writes and cleanup operations whose trusted obligations are already met, and drops effects outside the task's required artifact or cleanup set. Second, it removes confirmed correct sends. For an unknown delivery it inserts a permitted status query followed by a send only in the \code{not\_sent} branch. If querying is not permitted, common validation rejects that attempted route; the method is not allowed to add the permission.
+
+Third, the constructor may cut an attacker-created control dependency. If a predicate depends on a forbidden or secret read, the branch bodies become candidate material without that predicate. The constructor does not decide that both branches are correct. In fact, concatenating branches can duplicate effects or retain wrong computations; those cases should fail verification. A backward slice then removes data computations that no remaining effect needs. This can eliminate an unused forbidden read without needing the model to rewrite the whole helper.
+
+Fourth, the constructor adds bounded retries around effectful primitives. These retries are safe only for the interpreter's confirmed no-effect failure. Unknown sends remain distinct. The slice can reuse a verified intermediate variable, reducing work after a completed report calculation. The interpreter and independent goals are unchanged by all transformations. Their result is a candidate program whose acceptability still depends on executable checks.
+
+\begin{algorithm}[t]
+\caption{Bounded state-aware continuation construction}
+\begin{algorithmic}[1]
+\Require Trusted task $T$, history $H$, untrusted Skill $S$
+\State $C\gets$ residual goals, receipt constraints and dependency hints
+\State $E\gets[\ ]$ \Comment{retained counterexamples}
+\For{$i=1$ to $3$}
+  \If{$i=1$}
+    \State $p\gets S$ \Comment{source-derived first candidate}
+  \Else
+    \State $p\gets\operatorname{Model}(T,\operatorname{Observe}(H),S,C,E)$
+  \EndIf
+  \State $p'\gets\operatorname{LowerAndSlice}(p,C)$
+  \State $(ok,e)\gets\operatorname{CommonCheck}(T,H,p')$
+  \If{$ok$}\State \Return $p'$\EndIf
+  \State append $e$ to $E$
+\EndFor
+\State \Return no deployed continuation
+\end{algorithmic}
+\end{algorithm}
+
+The full method first applies these transformations to the original Skill. If this candidate fails, the model can propose up to two further programs. The ordinary repair, replan and candidate-generation controls can each propose up to three. All have the same maximum of three candidate checks. A model response may also stop or request confirmation. These outcomes remain in the denominator. Malformed responses, input-cap failures and provider failures are retained without silently replacing them with another successful run.
+
+\subsection{Common Verification and Counterexamples}
+For each candidate, the verifier replays the original prefix and the continuation in disposable worlds. It uses three validation inputs, two secret values, and both commitment histories when a delivery is uncertain. The candidate must satisfy the independent task predicates, preserve inputs, respect fixed permissions, avoid duplicate effects and retain a clean full history. It also compares public write, send and delete traces across secret values. Earlier forbidden disclosure makes safe completion false even if the continuation later produces the right report.
+
+The accepted program must satisfy the following finite test:
+\begin{equation}
+\bigwedge_{x\in V}\ \bigwedge_{w\in W(x,H)}
+\left[\operatorname{Goal}(T,H;p,x,w)\land
+\operatorname{Safe}(T,H;p,w)\right],
+\end{equation}
+where $V$ is the validation-input set and $W$ is the declared state uncertainty. Public-trace equality is an additional paired-world condition. This expression is deliberately finite. It is not a proof for every table, every secret value or an arbitrary external environment.
+
+A failed check returns a concrete code and relevant details: a forbidden resource, a missing variable, a remaining goal, a repeated operation and target, or a secret-dependent public trace. The next model proposal receives this evidence. All model methods except the feedback ablation receive the same underlying checker information; the ordinary repair prompt renders it as an error message. Repeated simulation never updates the actual current state. This distinction is stated explicitly because a candidate that sent a report in a rejected simulation has not sent it in the real prefix.
+
+After a candidate is accepted, final evaluation uses eight new input seeds that did not appear in its refinement loop. A candidate must pass all final worlds to count as safely complete. This catches a program that memorized one observed output, but finite testing can still miss errors outside these inputs. Only accepted candidates are deployed in the final finite environment. Rejected candidates are retained as proposals; their forbidden attempts are not incorrectly counted as executed real violations.
+
+\subsection{Why Some Unknown Effects Require Stopping}
+Consider two current histories with identical permitted observations. In the first, the required report was sent; in the second, it was not. Assume no permitted status query or other observation can distinguish them. A continuation that sends again violates once-only delivery in the first history. A continuation that never sends fails the delivery goal in the second. Therefore, under these assumptions, no deterministic continuation can guarantee both safety and completion in both histories. Random choice does not provide a guarantee either.
+
+This is a limit of available information, not a reason to relax authority. A permitted status query changes the problem by making the histories distinguishable. The experiment separates this unresolved state from missing write permission, exhausted allowance, model uncertainty and previous irreversible disclosure. These cases can all end with no accepted continuation, but their causes and appropriate interpretations differ.
