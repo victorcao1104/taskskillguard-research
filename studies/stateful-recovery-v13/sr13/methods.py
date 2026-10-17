@@ -23,7 +23,7 @@ def resume_after(program,location):
     return tail
 
 
-def offline_trial(method,case,validation_inputs,final_inputs):
+def offline_trial(method,case,validation_inputs,final_inputs,*,catalogue_program=None):
     start=perf_counter();cpu_start=thread_time();meter=start_meter();inputs=validation_inputs[0];details={}
     if method=='stop':p=[]
     elif method=='retry_original':p=deepcopy(case['skill'])
@@ -32,14 +32,15 @@ def offline_trial(method,case,validation_inputs,final_inputs):
         p=resume_after(case['skill'],stop.get('location','') if stop else '')
     elif method=='goal_direct':p=from_task(case,inputs)
     elif method=='catalogue_oracle':
-        # Advantaged reference prepared from trusted goals. Not a main competitor.
-        p=from_task(case,inputs)
+        if catalogue_program is None:raise ValueError('PREPARED_CATALOGUE_REQUIRED')
+        # A separately prepared task-specific answer; preparation cost is retained.
+        p=deepcopy(catalogue_program)
     elif method=='contract_source':
         details=construct(case['skill'],case,inputs);p=details['program']
     else:raise ValueError('UNKNOWN_METHOD')
     validation=check(p,case,validation_inputs)
     validation_attempts=[validation]
-    if not validation['accepted'] and method in {'goal_direct','catalogue_oracle'}:
+    if not validation['accepted'] and method=='goal_direct':
         p=construct(from_task(case,inputs,state_aware=False),case,inputs,omit='residual')['program']
         validation=check(p,case,validation_inputs);validation_attempts.append(validation)
     deployed=p if validation['accepted'] else []
