@@ -1,0 +1,76 @@
+{
+  "record_type": "post_holdout_reference_amendment",
+  "date": "2026-10-17",
+  "author_role": "independent AI reference author",
+  "reason": "The first held-out differential run exposed a trace-field convention mismatch and an incorrect missing-resource convention in the independently authored reference. The first run must remain a first-run failure record; corrected reruns are amended results, not fresh held-out success.",
+  "first_run": {
+    "artifact": "results/first_differential.json",
+    "summary_source": "Parent-reported aggregate counts; raw result artifact was not read by the independent reference author.",
+    "comparisons": 324,
+    "raw_mismatches": 292,
+    "trace_value_only_mismatches": 288,
+    "trace_value_and_missing_resource_mismatches": 4,
+    "retention": "Parent states the original artifact is preserved and subsequent output will use a new version. This amendment does not overwrite or verify that artifact."
+  },
+  "preserved_reference": {
+    "path": "reference_before_amendment.py",
+    "sha256": "b4ce59814a4d03cbbc2658d6f12b355b8887a0e363dd23d99bd47aaad199b8b5",
+    "preservation_method": "Exact bytes copied before any amendment into a newly created file with exclusive-create semantics.",
+    "original_reference_sha256": "b4ce59814a4d03cbbc2658d6f12b355b8887a0e363dd23d99bd47aaad199b8b5"
+  },
+  "amendments": [
+    {
+      "id": "reference-R1-missing-resources",
+      "classification": "Post-holdout behavioral correction to independently implemented reference, against a verified frozen protocol clause.",
+      "before": "An absent read or delete raised MissingFile before recording the effect. The run stopped and goal was false.",
+      "after": "An absent read records the requested operation and returns an empty string, retaining resource-expression and PC provenance. An absent delete records an attempted no-op. Both consume their trusted operation/resource attempt allowance. No host filesystem is accessed.",
+      "frozen_specification": {
+        "path": "provenance/pre_evaluation_freeze/protocol.py",
+        "sha256": "b7f4b7ebb41ca6487746bd1b05032e2d8ec16e3e0a578a518e99aa2014dd382e",
+        "field": "SYSTEM",
+        "verified_clause": "empty-string missing reads, no-op missing deletes",
+        "verification_method": "Read the frozen source and extracted the literal SYSTEM assignment with ast.literal_eval; did not import or execute the protocol module.",
+        "qualification": "This clause was not present in design.md read by the reference author. No claim is made that design.md specified missing-resource behavior."
+      }
+    },
+    {
+      "id": "reference-R2-read-trace-payload",
+      "classification": "Post-holdout trace-field alignment, not a behavior change or a verified pre-specified trace convention.",
+      "before": "A read event's value field contained the returned file text.",
+      "after": "A read event's value field contains its empty request payload. The read expression still returns the actual file text; provenance, emitted values, final files and goal evaluation are unchanged by this field alignment alone.",
+      "basis": "The parent reported that the production trace records the request payload. The frozen prose did not explicitly specify this trace field; this is disclosed as an amendment rather than retroactively described as a pre-frozen requirement."
+    }
+  ],
+  "verification": {
+    "command": "python -B -m unittest test_reference -v",
+    "tests_passed": 37,
+    "tests_failed": 0,
+    "previous_test_count": 33,
+    "new_regressions": [
+      "Read traces store an empty request payload while read expressions retain returned content.",
+      "Missing reads return an empty string and retain a requested effect record.",
+      "Missing reads retain resource-expression and branch-control provenance.",
+      "Suppressing an intermediate write yields an empty subsequent read and goal failure without a resource exception.",
+      "Missing deletes are no-ops but consume the operation/resource attempt limit."
+    ],
+    "current_reference_sha256": "f1c28873d97198a3d2e967f516b5744131b12aa2104ec06139ad44bdba8f25a0",
+    "current_tests_sha256": "8937bd31bf892803ceb597377d3f691e17188dc3320396e7ebb647bde7393db7",
+    "previous_tests_sha256": "7add1027307da8dd4887452e39f6eee33bb513b54795b5d04ceb1c08e6a7b936",
+    "design_read_sha256": "bb0221efb121c908fdfbb70c4f9e6769610a26faa44b3daa80dcca114639a9da"
+  },
+  "independence_and_scope": {
+    "production_adapter_or_runtime_read": false,
+    "old_reference_or_runtime_implementations_read": false,
+    "raw_evaluation_results_read": false,
+    "model_outputs_read": false,
+    "fixtures_changed": false,
+    "fixtures_imported_or_generated_by_this_amendment": false,
+    "files_written": [
+      "reference_before_amendment.py",
+      "reference.py",
+      "test_reference.py",
+      "amendments_reference.json"
+    ],
+    "differential_rerun_status": "Not run by the independent author; delegated to the parent under a new result version."
+  }
+}

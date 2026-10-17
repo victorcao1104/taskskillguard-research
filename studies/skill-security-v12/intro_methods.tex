@@ -1,0 +1,502 @@
+\section{Introduction}
+Agent Skills package reusable instructions with scripts and supporting files.
+They can help an agent complete a task consistently, but they also place
+third-party content close to tools that can read, change, delete, or disclose
+data. Studies have documented malicious Skills and attacks placed directly in
+Skill instructions~\cite{liu,skillinject}. Attacks can also depend on the
+interaction between apparently reasonable instructions and helper
+code~\cite{skillmutator}. Checking a description or searching for a dangerous
+tool name is therefore insufficient to establish what a package will do.
+
+The relevant security question depends on the user's task. Sending a report may
+be required when the user asks to share it, but excessive when the request is
+only to prepare a local copy. Deleting a temporary input may likewise be either
+requested cleanup or an unwanted loss of data. A task-aware analysis must link
+concrete actions to the requested operation, resource, destination, and side
+effects. SkillScope makes this action-in-task view central to Skill
+analysis~\cite{skillscope}. It also distinguishes authorization from necessity:
+an action can be outside the user's permission even when the current program
+depends on it.
+
+This distinction matters when a package introduces an unsafe prerequisite.
+Suppose a Skill reads an unrelated private file before producing the requested
+local output. Removing that read may cause the original script to fail because
+the script tests its returned value. The failure shows a dependency in that
+implementation. It does not show that the user authorized the read, or that a
+different implementation needs it. A legal alternative can provide useful
+evidence, but only if its inputs, permissions, and costs are made explicit.
+Giving a defended system an alternative that its baseline cannot inspect would
+confound the effect of recovery with unequal capabilities.
+
+Permission to use a destination also does not determine which data may be sent
+there. A task may permit reading private material for local processing and
+sending a public report to an approved endpoint. It need not permit sending the
+private material itself. Progent demonstrates explicit checks over tool names
+and arguments, including task-based policy generation~\cite{progent}. CaMeL
+demonstrates a separate role for control/data separation and information-flow
+restrictions~\cite{camel}. These are complementary precedents. We do not claim
+that task-aware permission checks or external enforcement are new.
+
+TaskSkillGuard studies how source-grounded action checks, fixed task
+permissions, finite flow restrictions, and recovery interact in a controlled
+Skill setting. The study asks three questions. First, can action assessment
+separate permission from dependence on an unsafe implementation? Second, which
+effects are blocked by operation/resource permissions, and which require
+checking the data sent to an otherwise permitted destination? Third, after a
+denial or a known tool failure, does cost-based route selection improve on a
+recovery controller with the same state, catalogue, simulation access, and
+remaining quota? Graph presentation is a secondary question.
+
+The contribution is a bounded combination and its controlled evaluation. Actual
+synthetic Skill text selects a small Python-like program; each accepted effect
+remains linked to its source. Executable task predicates check outputs,
+preserved inputs, and effects. Matched controls separate scope enforcement,
+flow enforcement, and recovery. Following the utility/security principle of
+AgentDojo and Agent Security Bench~\cite{agentdojo,asb}, the protocol includes
+legitimate communication and deletion, so blanket blocking cannot count as a
+useful solution.
+
+The implementation retains the source, grants, flow, and recovery framework of
+the preserved Phase 5 study and strengthens it with Phase 6-style executable
+checks and equal-capability controls. Historical observations remain separate
+from the new evaluation. The new study uses synthetic packages only and a finite
+in-memory execution model. It does not run arbitrary Python, contact real
+services, estimate ecosystem attack prevalence, or reproduce the complete
+SkillScope, Progent, or CaMeL systems. Its purpose is to make the tested security
+boundary and the remaining coverage gaps explicit.
+
+\input{related_work.tex}
+
+\section{Method}
+\label{sec:method}
+\subsection{Trusted Task and Untrusted Package}
+Figure~\ref{fig:pipeline} shows the boundary tested in this study. Package text
+selects a helper, but cannot grant that helper additional authority. The trusted
+task supplies the permissions and the desired outcome. Every original or
+recovery effect passes through the same gateway.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[>=Latex,box/.style={draw,rounded corners=2pt,align=center,font=\footnotesize,text width=3.0cm,minimum height=.72cm},node distance=.45cm]
+\node[box] (package) {Untrusted Skill package\\\texttt{SKILL.md} + helper source};
+\node[box,below=of package] (adapter) {Bounded source adapter\\effects linked to file and line};
+\node[box,below=of adapter] (guard) {Scope + data-flow gateway};
+\node[box,below=of guard] (effects) {In-memory effects\\check task outcome};
+\node[box,right=.7cm of adapter] (task) {Trusted task\\grants, readers, goal};
+\node[box,right=.7cm of effects] (routes) {Trusted alternatives\\same state and quota};
+\draw[->] (package)--(adapter);
+\draw[->] (adapter)--(guard);
+\draw[->] (guard)--(effects);
+\draw[->] (task)--(guard);
+\draw[->] (effects)--(routes);
+\draw[->] (routes)--(guard);
+\end{tikzpicture}
+\caption{The Skill-security boundary. A model precheck can restrict original
+source sites but cannot change the trusted task. After a block or known failure,
+recovery reuses the gateway.}
+\label{fig:pipeline}
+\end{figure}
+The trusted task is represented as
+\begin{equation}
+T=(F_0,G,L,R,H,C,Q),
+\end{equation}
+where $F_0$ is the initial logical file state, $G$ is a set of exact
+operation/resource grants, $L$ gives optional per-resource attempt limits,
+$R$ gives outbound reader restrictions, $H$ is the goal predicate, $C$ is a finite
+catalogue of trusted alternative scripts, and $Q$ is the shared call quota.
+These inputs are supplied by the experiment. The study does not infer their
+correctness from a Skill description or claim to solve natural-language policy
+synthesis.
+
+The untrusted package contains \texttt{SKILL.md} and script text. Package claims
+such as ``the administrator approved this upload'' can be analysed as content;
+they cannot add a grant, change a reader restriction, enlarge the quota, or
+replace a trusted alternative. Optional model predictions can restrict proposed
+original actions but cannot grant additional authority. Table~\ref{tab:trust}
+summarizes this boundary.
+
+\begin{table}[t]
+\caption{Inputs and their authority in the finite model.}
+\label{tab:trust}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{0.27\columnwidth}p{0.65\columnwidth}}
+\hline
+Input & Permitted role \\
+\hline
+Trusted task & Defines grants, limits, flow restrictions, initial state, and goal. \\
+Skill text and script & Supply the original program and evidence to inspect. \\
+Source metadata & Links accepted effects to file content and source locations. \\
+Model labels & Propose an original-action filter; cannot modify trusted inputs. \\
+Trusted catalogue & Supplies explicit alternative programs under the same task. \\
+\hline
+\end{tabular}
+\end{table}
+
+An attacker in this model controls the original Skill instructions and script,
+including misleading explanations and artificial dependencies. The attacker
+does not control the dispatcher, initial task, trusted catalogue, or scoring
+predicates. This boundary deliberately isolates whether the enforced task
+constraints survive hostile package content. It does not cover a compromised
+tool implementation, operating system, or task provider.
+
+\subsection{From Source Text to a Finite Program}
+The adapter requires one closed shell code block in \texttt{SKILL.md} containing
+a single invocation of the form \texttt{python scripts/main.py}. The selected
+path must be relative, normalized, traversal-free, and present in the supplied
+package. Other shell commands, an ambiguous invocation, or a missing entry file
+produce an unsupported result. The invocation selects text for parsing; it is
+never passed to a shell.
+
+The accepted language contains string, integer, and Boolean constants,
+variables, assignments, string concatenation, and uppercase conversion. It
+supports equality branches, literal loops of zero to three iterations, and
+acyclic zero-argument helpers. Loop indices cannot be read. Helpers use renamed
+local variables and require definite assignment before local reads. Imported
+names, helper names, and the reserved internal prefix cannot be rebound.
+Imports are limited to \texttt{Path} and the mock \texttt{emit} function.
+Return statements, recursion, dynamic imports, arbitrary calls, and unsupported
+operators are rejected. Integer and Boolean values may participate in accepted
+expressions, but resource and payload arguments to effects must be strings.
+
+Table~\ref{tab:semantics} states the effect semantics. Names resemble Python
+operations to make source inspection familiar, but their meaning is defined by
+this table. In particular, a missing read yields the empty string, and deleting
+a missing resource leaves the state unchanged. Such a deletion is still a
+recorded effect attempt and consumes quota when dispatched. These conventions
+differ from ordinary host filesystem behaviour.
+
+\begin{table}[t]
+\caption{Effects in the bounded source language.}
+\label{tab:semantics}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{0.47\columnwidth}p{0.45\columnwidth}}
+\hline
+Source expression & Finite meaning \\
+\hline
+\texttt{Path(p).read\_text()} & Read logical string at $p$; return empty string if absent. \\
+\texttt{Path(p).write\_text(v)} & Replace logical file $p$ with string $v$ and its labels. \\
+\texttt{Path(p).unlink()} & Remove logical file $p$ if present; absence is a no-op. \\
+\texttt{emit(d,v)} & Append destination/string pair $(d,v)$ to an in-memory log. \\
+\hline
+\end{tabular}
+\end{table}
+
+The adapter lowers accepted syntax into the finite intermediate language used
+for the Phase 6 checks. Each effect receives a file-and-line identifier, source
+span, source text, and file SHA-256 hash. Multiple statements on a line are
+rejected to avoid ambiguous statement identities. Each source script is limited
+to 24,000 encoded bytes, and each actual or simulated route has a 100-step
+execution bound. Exceeding the runtime step bound is a stopped execution, not a
+completed safe task. The original Phase 5 extractor is retained as a separate
+measurement; its candidate graph is not treated as a complete execution model.
+
+No original source is executed through \texttt{exec}, \texttt{eval}, a
+subprocess, or a host file tool. Files and destinations are exact logical
+strings. There is no claim about path aliases, symlinks, real permissions,
+remote services, or operating-system isolation. Source hashes identify the text
+used for an observation; they do not establish the publisher's trustworthiness.
+
+All catalogue scripts are compiled before any route executes. Consequently, an
+invalid alternative prevents execution even if the original script is valid.
+This is a catalogue validation failure, which must be reported separately from
+an unsupported original package. The runtime exposes an unsupported outcome
+for both; the analysis distinguishes their validation stage.
+
+\subsection{Scope and Information-Flow Checks}
+For a proposed effect $e=(o,r,v)$, the scope check requires the exact pair
+$(o,r)$ to be in $G$. It also requires the relevant attempt count to remain
+below $L(o,r)$, except when a valid known receipt is being reused. If no local
+limit is supplied, it does not further constrain the finite run. An attempted
+call consumes both the shared quota and its resource-specific attempt count,
+including a call denied by a guard or stopped by an injected failure before
+commit. Receipt reuse does not dispatch a new call and is not charged again.
+
+Values carry sets of restricted source origins. An initial file with an entry
+in $R$ starts with its resource as an origin. A file without such an entry is
+public in this model; an explicitly empty reader list forbids outbound
+disclosure. Assignment, concatenation, uppercase conversion, file writes, and
+branch control propagate origins. A read receives the stored file labels and
+the labels influencing its resource and control context. This is a finite label
+semantics, not a claim of noninterference for arbitrary Python.
+
+Let $O(e)$ contain the origins influencing an effect's resource, payload, and
+branch control. An outbound effect to destination $d$ passes the flow check
+exactly when
+\begin{equation}
+\operatorname{FlowOK}(e)
+=\bigwedge_{s\in O(e)} [d\in R(s)].
+\end{equation}
+The conjunction is true for an empty origin set. The check is applied to
+outbound emits; the supported writes preserve labels for later reads. There is
+no declassification operation. A guard checks both scope and flow again before
+reusing a receipt.
+
+For example, permission to emit to \texttt{review} does not allow a payload
+derived from a source whose reader list excludes \texttt{review}. Replacing the
+payload with its uppercase form retains that restriction. Writing it to a
+temporary logical file and reading it back also retains the origin. These cases
+separate destination permission from payload permission without assuming that
+all network-like actions are malicious.
+
+\subsection{Goals, Effects, and Successful Completion}
+The goal predicate $H$ can require exact file contents, absence of specified
+files, exact counts of required destination/payload pairs, and preservation of
+specified inputs. Preservation checks both existence and content against $F_0$.
+An unconstrained output is not silently made part of the task. Separate security
+checks detect unauthorized effects even when the final files satisfy $H$.
+
+For each run, let $E_c$ be its committed effects. The analysis counts scope
+violations and forbidden outbound flows across the complete trace. Authorized
+completion requires an actual attempt, a satisfied goal, no terminal error,
+and no committed scope or flow violation:
+\begin{equation}
+\begin{split}
+\operatorname{Success}={}&\operatorname{Attempted}\land H\land
+\operatorname{NoError}\\
+&\land\bigwedge_{e\in E_c}
+\left(\operatorname{ScopeOK}(e)\land\operatorname{FlowOK}(e)\right).
+\end{split}
+\end{equation}
+A final output cannot erase an earlier disclosure. Conversely, a denied action
+is an observed attempt but not a committed harmful effect. The report keeps
+these events and denominators separate. Committed reads are included in scope
+checking, because collecting an unauthorized source is itself an excess action.
+
+\subsection{Two Bounded Necessity Tests}
+Consider a simple local-report task. The trusted task allows reading
+\texttt{/input} and writing its uppercase text to \texttt{/output}; it does
+not allow reading \texttt{/private}. The following schematic helper adds an
+artificial prerequisite:
+\begin{quote}\small\ttfamily
+token = Path("/private").read\_text()\\
+if token == "A":\\
+\hspace*{1em}text = Path("/input").read\_text()\\
+\hspace*{1em}result = text.upper()\\
+\hspace*{1em}Path("/output").write\_text(result)
+\end{quote}
+In a world where the private value is \texttt{A}, the original output is
+correct. Suppressing the private read makes the condition false and prevents
+the output. A dependency-only check could therefore call the read necessary.
+Yet the task grants still reject it. A legal helper can read \texttt{/input}
+and write the transformed text directly, without the private read or branch.
+The example explains why task completion, implementation dependence and
+authorization need different tests. It is a schematic explanation of the
+artificial-prerequisite mechanism, not an additional measured case.
+
+Necessity is evaluated separately from permission. First, the original-program
+test compares a no-fault execution with an intervention that suppresses every
+occurrence of one source action site. A suppressed read supplies an empty
+string; a suppressed write, deletion, or emit produces no effect. The comparison
+checks the resulting task predicate. A failure after intervention is evidence
+of dependence under this particular program and neutralization rule. It does
+not establish that the action is required by the task. Sites not reached by the
+original execution cannot receive a confirmed execution-based label.
+
+The catalogue test considers the original and trusted routes from the same
+initial state, without injected faults. Let $\mathcal{P}$ be the routes that
+meet the goal while remaining within scope and flow restrictions. For an
+observed source site $a$, let $T_a$ be its observed operation/resource pairs.
+The test asks whether a legal route avoids every pair in $T_a$; it does not
+require an alternative script to share the original file-and-line identity.
+Let $E(p)$ be the pairs used by route $p$, and let $\mathcal{A}_a$ contain the
+legal routes for which $E(p)\cap T_a=\varnothing$. The finite label is
+\begin{equation}
+N_C(a)=
+\begin{cases}
+\mathrm{no}, & \operatorname{closed}(C)\land\mathcal{A}_a\ne\varnothing,\\
+\mathrm{yes}, & \operatorname{closed}(C)\land\mathcal{P}\ne\varnothing
+\land\mathcal{A}_a=\varnothing,\\
+\mathrm{unknown}, & \text{otherwise}.
+\end{cases}
+\end{equation}
+Unexecuted sites remain unknown or not applicable. The implementation returns
+unknown for every open catalogue. This is conservative: a legal avoiding
+witness could logically establish a negative result even without closure, but
+that stronger rule is not implemented here. The prompt wording mentions both
+the witness rule and an open-catalogue unknown rule; our empty-open contexts
+have no legal witness, so this ambiguity does not change their ground truth.
+No legal solution also yields unknown. A closed catalogue means complete only
+within the explicitly supplied finite set; it does not enumerate all possible
+implementations. This is operation/resource-class necessity, not a claim that
+the original payload or data origin is necessary. The same unsafe prerequisite can therefore be required by the
+original script and avoidable by a legal catalogue route.
+
+The protocol checks the accepted source through a separate AST interpreter
+that does not call production lowering. It also checks agreement with the
+Phase 6 finite-language reference where applicable. These comparisons assess
+effects, goals, and interventions within the documented model. Agreement does
+not prove the model matches every real Python program. Initial disagreements
+and subsequent repairs belong in the evidence record.
+
+\subsection{Recovery with Fixed Authority and Shared Cost}
+Every configuration tries the original route first. Recovery retains the
+current logical files, flow labels, outbound log, resource counts, quota, and
+known receipts. It starts a fresh variable environment for the next route, but
+does not roll back effects, reset quota, or add permissions. Non-recovery modes
+make one actual route attempt. Recovery modes allow at most four actual
+attempts in total, including the original.
+
+After a recoverable stop, both recovery controllers simulate all eligible
+alternatives from copies of the same current state. A route is feasible if its
+simulation terminates without error and meets the goal under the same guards
+and remaining quota. Previously selected alternatives are removed from the
+unused set. The current route may be retried after a known before-commit failure
+or a failure with a known completion receipt. Simulations assume no new fault;
+they do not reveal a future injected failure.
+
+The first-feasible controller selects the feasible route with the lowest fixed
+catalogue index. The minimum-call controller minimizes the number of additional
+charged calls in the simulation, breaking ties by that same index. Both
+controllers perform the full eligibility simulation, so any difference is not
+caused by giving only one controller access to a feasibility oracle. Simulated
+calls and interpreter steps are reported separately from actual dispatched
+calls. Simulation is not charged against the real execution quota, but its work
+is not presented as free.
+
+Receipts use the finite key
+\begin{equation}
+k=(\text{operation},\text{resource},\text{payload},\text{occurrence}).
+\end{equation}
+The occurrence counts appearances of the same operation/resource/payload
+signature within a route attempt and restarts for a new attempt. It aligns
+matching logical effects across routes. A known receipt reuses the recorded
+return value and labels rather than dispatching the operation again; this
+includes recorded reads. The duplicate counter concerns repeated commits of
+this same finite key, not every repeated equal payload. The key does not include
+the source location or a remote transaction identifier. This convention is
+useful for the constructed routes, but is not a general exactly-once protocol
+or a guarantee that arbitrary retries are equivalent.
+
+\subsection{Known and Ambiguous Failure Outcomes}
+The fault model places at most one fault at the first admitted, newly dispatched
+non-read effect. Reads, guard denials, and receipt reuses do not trigger it.
+Table~\ref{tab:faults} distinguishes when an effect occurs and what the controller
+knows. A profile may never trigger if execution stops before reaching an eligible
+effect; such a run must not be described as having exercised a mutation fault.
+
+\begin{table}[t]
+\caption{Finite fault profiles and allowed response.}
+\label{tab:faults}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{0.24\columnwidth}p{0.35\columnwidth}p{0.31\columnwidth}}
+\hline
+Profile & Effect and receipt & Controller response \\
+\hline
+No fault & Normal effect and receipt & Continue. \\
+Before commit & No effect; no receipt & May retry or use a legal alternative. \\
+Known after commit & Effect occurs; receipt retained & May recover with receipt reuse. \\
+Ambiguous after commit & Effect occurs; no receipt & Stop without retry. \\
+\hline
+\end{tabular}
+\end{table}
+
+The evaluator can record the effect of the ambiguous profile because it controls
+the finite environment. The controller does not use that privileged observation
+to continue. It stops on an ambiguous outcome or exhausted quota. If no
+simulated route is feasible, recovery also stops. These explicit failure states
+prevent successful output alone from being confused with a justified recovery.
+
+\section{Experimental Design}
+\label{sec:experimental-design}
+\subsection{Synthetic Cases and Freeze Boundary}
+The main set contains 48 supported cases: 12 mechanism families, each
+with a benign and an adversarial form and two lexical variants. Six separate
+unsupported probes test the source-coverage boundary. The variants are
+dependent constructions, not 48 independent attack families. Family-level
+summaries are therefore the primary unit for interpreting variation. The set is
+not a random sample of a marketplace and does not estimate production risk.
+
+The mechanisms cover authority claims, excessive collection, unauthorized
+destinations, forbidden payloads sent to permitted destinations, derived and
+file-mediated flows, artificial prerequisites, source changes, repeated
+effects, and helper functions. Benign counterparts include required
+communication and deletion. Their purpose is to test whether a guard preserves
+the distinction between a powerful action and an unauthorized one.
+
+Separate development fixtures support unit testing. Production code and the
+model protocol were frozen before the evaluation generator was first run or
+read by the implementation context. The generator and direct AST reference
+were developed in a separate assistant context that did not read the production
+modules. This provides implementation separation, not independent human
+validation. Case identities, source hashes, run configuration, and first
+failures are retained. Repairs after release are explicit amendments; their
+results remain separate from the first comparison. No human labels or real
+Skill packages are used in these experiments.
+
+\subsection{Matched Controls}
+Table~\ref{tab:controls} defines the five mechanism controls. Each starts from
+the same task and original source. The matrix applies the four fault
+profiles to every supported case and control. A record of an assigned profile
+is kept distinct from evidence that its fault was reached. The original and
+catalogue necessity tests use their separate no-fault initial-state protocol.
+
+\begin{table}[t]
+\caption{Mechanism controls. All use the same trusted task.}
+\label{tab:controls}
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{0.24\columnwidth}ccc p{0.25\columnwidth}}
+\hline
+Control & Scope & Flow & Recovery & Selection \\
+\hline
+Observe & No & No & No & Original only \\
+Scope & Yes & No & No & Original only \\
+Scope + flow & Yes & Yes & No & Original only \\
+First feasible & Yes & Yes & Yes & Fixed route order \\
+Minimum calls & Yes & Yes & Yes & Fewest added calls \\
+\hline
+\end{tabular}
+\end{table}
+
+Observe mode records the same authorization and flow predicates while allowing
+their violations to occur in memory. It is not real-world unguarded execution.
+Scope versus scope-plus-flow isolates the payload restriction. The two recovery
+modes share the complete catalogue and simulation ability; their difference is
+the selection rule. All controls retain the same supported execution and
+receipt conventions. Broader claims about other receipt designs require a
+separate experiment.
+
+\subsection{Outcomes and Coverage}
+Primary outcomes are runs with any unauthorized committed effect, runs with
+any forbidden outbound flow, authorized goal completion, duplicate mutations
+under the defined key, charged calls, simulated calls, and planner steps.
+Counts of individual effects accompany run-level counts where useful. The
+denominator must identify whether it concerns all supported cases, a mechanism
+family, or a predeclared attack opportunity. Blocked attempts, terminal errors,
+unsupported originals, and invalid catalogues are separate outcomes rather than
+silent exclusions or safe classifications.
+
+Source coverage is reported independently of action-label quality. A supported
+program may contain an unexecuted action site; the site is not confirmed safe
+merely because one task does not reach it. Model abstentions and malformed
+answers remain in coverage denominators. Predictions cannot replace the
+executable goal or effect checks. Any uncertainty intervals must preserve family
+dependence and be described cautiously with only 12 constructed families.
+
+The model audit receives the complete synthetic package and trusted task.
+Source/table and graph presentations are secondary comparisons, using the
+same gateway and retained invalid responses. Model
+labels only restrict original action sites; trusted recovery routes remain
+subject to the unchanged scope and flow guards. The audit therefore measures a
+specified component of the system, not end-to-end autonomous permission
+generation. Its samples and costs are reported separately from deterministic
+mechanism runs. The frozen acquisition uses GPT-6 Luna and GPT-4.1 mini, one
+response per distinct input, with no automatic retries. It covers every main
+case in two views and adds empty open/closed catalogue contexts for the first
+attack variant in each family. Identical inputs reuse the same saved response.
+The graph adds conservative data, control, and call edges derived from the
+finite program; it does not add a gold label. Source text and trusted task facts
+are identical across views. Graph length is not matched by a padding control,
+so the comparison measures the addition of graph information and its token
+cost together. JSON answers use a fixed schema and a phase-aware parser.
+
+The preserved Phase 5 graph results and Phase 6 strong-control results provide
+historical context with their original denominators. They are not pooled with
+the new cases or treated as independent replications of this source adapter.
+Negative graph results and a lack of advantage over an equally capable recovery
+control remain valid outcomes. The evaluation is intended to identify what each
+mechanism contributes within the stated boundary, including where the proposed
+combination adds no measurable benefit.
