@@ -57,7 +57,7 @@ def run_program(program,world,task,*,state=False,reuse=True,legacy_name=None):
                 cell={'value':m.w['files']['/output/selection'],'labels':m.w['file_labels'].get('/output/selection',[])}
                 if not certify('artifact',cell):raise Halt('IRREVERSIBLE_WRONG_ARTIFACT')
                 m.put('result',V(cell['value']));reused='artifact';found=True
-            if not found and reuse:
+            if not found and reuse and not world.get('env_presence_labels'):
                 for name,cell in sorted(m.w['saved'].items()):
                     if legacy_name is not None:
                         ok=name==legacy_name and 'secret' not in cell.get('labels',[])

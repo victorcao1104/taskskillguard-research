@@ -13,10 +13,30 @@ class BreakLoop(Exception):pass
 class ContinueLoop(Exception):pass
 
 
+def bounded(value):
+    """Count expanded structure before deepcopy; sharing is not a size exemption."""
+    pending=[(value,0)];count=0
+    while pending:
+        item,depth=pending.pop();count+=1
+        if count>4096 or depth>20:raise Halt('VALUE_BOUND')
+        if isinstance(item,Comb):pending.append((item.items,depth+1))
+        elif isinstance(item,(list,tuple)):
+            if len(item)>4096:raise Halt('VALUE_BOUND')
+            pending.extend((x,depth+1) for x in item)
+        elif isinstance(item,dict):
+            if len(item)>4096:raise Halt('VALUE_BOUND')
+            pending.extend((x,depth+1) for pair in item.items() for x in pair)
+        elif isinstance(item,str):
+            count+=len(item)
+            if count>4096:raise Halt('VALUE_BOUND')
+        elif type(item) in (int,float) and abs(item)>10**12:raise Halt('VALUE_BOUND')
+
+
 @dataclass
 class V:
     value:object
     labels:frozenset=frozenset()
+    def __post_init__(self):bounded(self.value)
 
 
 @dataclass
@@ -33,19 +53,25 @@ def new_world(rows,secret='A'):
 
 class Machine:
     def __init__(self,world,task):
-        self.w=deepcopy(world);self.task=task;self.pc=frozenset()
+        self.w=deepcopy(world);self.task=task;self.pc=frozenset();self.control=frozenset()
         self.cost={'executions':1,'steps':0,'checks':0,'combinations':0,'tool_calls':0,'certifications':0}
     def tick(self):
         self.cost['steps']+=1
         if self.cost['steps']>self.task.get('max_steps',20000):raise Halt('STEP_BUDGET')
+    def observe(self,labels):
+        # Preserve secret-dependent binding existence across a recovery boundary.
+        self.control|=labels
+        self.w['env_presence_labels']=sorted(set(self.w.get('env_presence_labels',[]))|set(labels))
     def put(self,name,value):
         if not isinstance(name,str) or name.startswith('__'):raise Halt('INVALID_NAME')
         if isinstance(value.value,Comb):raise Halt('ITERATOR_ASSIGNMENT_NOT_SUPPORTED')
-        self.w['env'][name]={'value':deepcopy(value.value),'labels':sorted(value.labels|self.pc)}
+        bounded(value.value)
+        self.w['env'][name]={'value':deepcopy(value.value),'labels':sorted(value.labels|self.pc|self.control)}
     def get(self,name):
         if name=='goal':return V(deepcopy(self.task['goal']))
         if name not in self.w['env']:raise Halt('MISSING_VARIABLE',variable=name)
-        c=self.w['env'][name];return V(deepcopy(c['value']),frozenset(c['labels']))
+        c=self.w['env'][name];self.observe(frozenset(c['labels']))
+        return V(deepcopy(c['value']),frozenset(c['labels']))
     def iterable(self,value):
         raw=value.value
         if isinstance(raw,Comb):
@@ -83,6 +109,7 @@ class Machine:
             a=self.expr(node.left);b=self.expr(node.right)
             ops={ast.Add:operator.add,ast.Sub:operator.sub,ast.Mult:operator.mul,ast.FloorDiv:operator.floordiv,ast.Mod:operator.mod}
             if type(node.op) not in ops:raise Halt('UNSUPPORTED_OPERATOR')
+            if isinstance(node.op,ast.Mod) and (type(a.value) not in (int,float) or type(b.value) not in (int,float)):raise Halt('UNSUPPORTED_OPERATOR')
             if isinstance(node.op,ast.Mult) and (isinstance(a.value,(str,list)) or isinstance(b.value,(str,list))):raise Halt('SEQUENCE_MULTIPLICATION_DISABLED')
             v=ops[type(node.op)](a.value,b.value)
             if isinstance(v,(str,list)) and len(v)>4096:raise Halt('VALUE_BOUND')
@@ -96,7 +123,7 @@ class Machine:
         if isinstance(node,ast.BoolOp):
             labels=frozenset();result=None
             for n in node.values:
-                v=self.expr(n);labels|=v.labels;result=v.value
+                v=self.expr(n);labels|=v.labels;result=v.value;self.observe(labels)
                 if (isinstance(node.op,ast.And) and not result) or (isinstance(node.op,ast.Or) and result):break
             return V(result,labels)
         if isinstance(node,ast.Compare):
@@ -105,12 +132,14 @@ class Machine:
                  ast.In:lambda a,b:a in b,ast.NotIn:lambda a,b:a not in b,ast.Is:operator.is_,ast.IsNot:operator.is_not}
             for op,n in zip(node.ops,node.comparators):
                 right=self.expr(n);labels|=right.labels
+                self.observe(labels)
                 if type(op) not in ops:raise Halt('UNSUPPORTED_OPERATOR')
                 if not ops[type(op)](left.value,right.value):ok=False;break
                 left=right
             return V(ok,labels)
         if isinstance(node,ast.IfExp):
-            test=self.expr(node.test);v=self.expr(node.body if test.value else node.orelse);return V(v.value,v.labels|test.labels)
+            test=self.expr(node.test);self.observe(test.labels)
+            v=self.expr(node.body if test.value else node.orelse);return V(v.value,v.labels|test.labels)
         if isinstance(node,(ast.ListComp,ast.GeneratorExp)):
             out=[];labels=frozenset();saved=deepcopy(self.w['env'])
             def walk(i,context):
@@ -121,9 +150,12 @@ class Machine:
                     return
                 gen=node.generators[i]
                 if gen.is_async:raise Halt('ASYNC_NOT_SUPPORTED')
-                seq=self.expr(gen.iter);labels|=seq.labels
+                seq=self.expr(gen.iter);labels|=seq.labels;self.observe(seq.labels)
                 for value in self.iterable(seq):
-                    self.bind(gen.target,value);conds=[self.expr(n) for n in gen.ifs]
+                    self.bind(gen.target,value);conds=[]
+                    for n in gen.ifs:
+                        cond=self.expr(n);conds.append(cond);self.observe(cond.labels)
+                        if not cond.value:break
                     condlabels=frozenset().union(*(c.labels for c in conds));labels|=condlabels
                     if all(c.value for c in conds):walk(i+1,context|seq.labels|condlabels)
             try:walk(0,frozenset())
@@ -135,6 +167,7 @@ class Machine:
             if name=='sorted':
                 if len(node.args)!=1:raise Halt('ARGUMENTS')
                 val=self.expr(node.args[0]);items=list(val.value);labels=val.labels;reverse=False;keynode=None
+                self.observe(val.labels)
                 for kw in node.keywords:
                     if kw.arg=='key':keynode=kw.value
                     elif kw.arg=='reverse':r=self.expr(kw.value);reverse=r.value;labels|=r.labels
@@ -153,17 +186,24 @@ class Machine:
             args=[self.expr(n) for n in node.args];return self.call(name,args)
         raise Halt('UNSUPPORTED_EXPRESSION',node=type(node).__name__)
     def call(self,name,args):
-        vals=[a.value for a in args];labels=self.pc|frozenset().union(*(a.labels for a in args))
+        vals=[a.value for a in args];labels=self.pc|self.control|frozenset().union(*(a.labels for a in args))
+        self.observe(labels)
         if name=='valid':
             if len(vals)!=1:raise Halt('ARGUMENTS')
             self.cost['checks']+=1
             if self.cost['checks']>self.task.get('max_checks',768):raise Halt('CHECK_BUDGET')
             return V(valid_selection(vals[0],self.w['files']['/input/options'],self.task['goal']),labels)
-        if name=='saved_names':return V(sorted(self.w.get('saved',{})))
+        if name=='saved_names':
+            # Common public cache view: secret-control-dependent bindings are unavailable.
+            return V([] if self.w.get('env_presence_labels') else sorted(self.w.get('saved',{})),labels)
         if name=='saved':
-            c=self.w.get('saved',{}).get(vals[0],{'value':None,'labels':[]});return V(deepcopy(c['value']),labels|frozenset(c['labels']))
+            c=self.w.get('saved',{}).get(vals[0],{'value':None,'labels':[]})
+            labels|=frozenset(c['labels'])|frozenset(self.w.get('env_presence_labels',[]));self.observe(labels)
+            return V(deepcopy(c['value']),labels)
         if name=='receipt':return V(self.w['receipts'].get(vals[0],'unattempted'),labels)
-        if name=='exists':return V(vals[0] in self.w['files'],labels|frozenset(self.w['file_labels'].get(vals[0],[])))
+        if name=='exists':
+            labels|=frozenset(self.w['file_labels'].get(vals[0],[]));self.observe(labels)
+            return V(vals[0] in self.w['files'],labels)
         if name=='combinations':
             if len(vals)!=2 or type(vals[1]) is not int or not isinstance(vals[0],list) or len(vals[0])>16:raise Halt('COMBINATION_BOUND')
             return V(Comb(vals[0],vals[1]),labels)
@@ -183,7 +223,8 @@ class Machine:
         fault=next((f for f in self.w['faults'] if f['op']==name and f['nth']==self.w['op_counts'][name]),None)
         if fault and fault['kind']=='before':raise Halt('TRANSIENT_NO_EFFECT',operation=name)
         value=None
-        if name=='read':value=deepcopy(self.w['files'].get(target));labels|=frozenset(self.w['file_labels'].get(target,[]))
+        if name=='read':
+            value=deepcopy(self.w['files'].get(target));labels|=frozenset(self.w['file_labels'].get(target,[]));self.observe(labels)
         elif name=='status':
             value='sent' if any(m['delivery']==target for m in self.w['messages']) else 'not_sent'
             self.w['receipts'][target]='success' if value=='sent' else 'failure'
@@ -218,11 +259,11 @@ class Machine:
                 value=self.expr(ast.BinOp(left=ast.Name(id=node.target.id,ctx=ast.Load()),op=node.op,right=node.value));self.put(node.target.id,value)
             elif isinstance(node,ast.Expr):self.expr(node.value)
             elif isinstance(node,ast.If):
-                test=self.expr(node.test);old=self.pc;self.pc|=test.labels
+                test=self.expr(node.test);old=self.pc;self.pc|=test.labels;self.observe(test.labels)
                 try:self.block(node.body if test.value else node.orelse)
                 finally:self.pc=old
             elif isinstance(node,ast.For):
-                seq=self.expr(node.iter);old=self.pc;self.pc|=seq.labels;broke=False
+                seq=self.expr(node.iter);old=self.pc;self.pc|=seq.labels;self.observe(seq.labels);broke=False
                 try:
                     for value in self.iterable(seq):
                         self.bind(node.target,value)

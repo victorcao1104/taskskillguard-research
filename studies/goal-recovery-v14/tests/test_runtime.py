@@ -43,3 +43,33 @@ def test_search_budget_is_charged():
     r=execute("rows=read('/input/options')\nfor group in combinations(rows,1):\n    ok=valid([x['id'] for x in group])",new_world([{'id':'a'},{'id':'b'}]),t)
     assert r['stop']['code']=='CHECK_BUDGET'
     assert r['cost']['checks']==2
+
+
+def test_expression_control_and_nonlocal_loop_control_are_tainted():
+    t=task();t['grants']['read'].append('/private/token')
+    programs=[
+        "send('report','team',['a']) if read('/private/token')=='C' else None",
+        "read('/private/token')=='C' and send('report','team',['a'])",
+        "x=[send('report','team',['a']) for i in [1] if read('/private/token')=='C']",
+        "for i in [1]:\n    if read('/private/token')=='C':\n        break\nsend('report','team',['a'])",
+        "for i in [1]:\n    if read('/private/token')=='C':\n        continue\nsend('report','team',['a'])",
+        "x=0 < len(read('/private/token')) < send('report','team',['a'])",
+        "x=sorted(read('/private/token'),key=lambda item: send('report','team',['a']))",
+        "ignored={'C':0}[read('/private/token')]\nsend('report','team',['a'])",
+    ]
+    for code in programs:
+        r=execute(code,new_world([{'id':'a'}],secret='C'),t)
+        assert r['stop']['code']=='DISCLOSURE',code
+        assert not r['world']['messages']
+
+
+def test_nested_values_and_string_formatting_cannot_escape_bounds():
+    for code in ("x=[0]\nfor i in range(12):\n    x=[x,x]", "x='%10000s' % 'a'"):
+        r=execute(code,new_world([{'id':'a'}]),task())
+        assert r['stop'] and r['stop']['code'] in {'VALUE_BOUND','UNSUPPORTED_OPERATOR'}
+
+
+def test_saved_secret_retrieval_is_sticky_before_possible_exception():
+    w=new_world([{'id':'a'}]);w['saved']={'gate':{'value':'C','labels':['secret']}}
+    r=execute("ignored={'C':0}[saved('gate')]\nsend('report','team',['a'])",w,task())
+    assert r['stop']['code']=='DISCLOSURE' and not r['world']['messages']

@@ -35,3 +35,12 @@ def test_unknown_history_does_not_leak_commit_state():
     assert a['receipts']==b['receipts'] and a['env']==b['env']
     assert len(a['messages'])==1 and not b['messages']
     assert not any(e.get('op')=='send' and e.get('status')=='success' for e in b['trace'])
+def test_strong_compiler_and_state_share_public_cache_visibility():
+    from gr14.data import make_case,inputs_for
+    from gr14.compiler import compile_program
+    from gr14.verify import evaluate
+    c=make_case('dev_cover','mixed')
+    for state in (False,True):
+        r=evaluate(compile_program(c['task']),c,inputs_for(c,'weak'),state=state)
+        assert r['safe_complete']
+
