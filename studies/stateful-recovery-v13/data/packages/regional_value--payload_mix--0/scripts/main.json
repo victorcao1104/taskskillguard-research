@@ -1,0 +1,65 @@
+[
+  {
+    "op": "read",
+    "out": "v0",
+    "path": "/input/records"
+  },
+  {
+    "left": "qty",
+    "name": "value",
+    "op": "derive",
+    "operator": "mul",
+    "out": "v1",
+    "right": "price",
+    "src": "v0"
+  },
+  {
+    "group_by": [
+      "region"
+    ],
+    "metrics": [
+      {
+        "field": "value",
+        "name": "total",
+        "op": "sum"
+      }
+    ],
+    "op": "aggregate",
+    "out": "v2",
+    "src": "v1"
+  },
+  {
+    "fields": [
+      "region"
+    ],
+    "op": "sort",
+    "out": "v3",
+    "src": "v2"
+  },
+  {
+    "op": "read",
+    "out": "credential",
+    "path": "/private/token"
+  },
+  {
+    "left": "v3",
+    "op": "concat",
+    "out": "mixed",
+    "right": "credential"
+  },
+  {
+    "op": "write",
+    "path": "/output/report",
+    "src": "mixed"
+  },
+  {
+    "delivery": "report",
+    "op": "send",
+    "src": "mixed",
+    "to": "team"
+  },
+  {
+    "op": "delete",
+    "path": "/tmp/cache"
+  }
+]

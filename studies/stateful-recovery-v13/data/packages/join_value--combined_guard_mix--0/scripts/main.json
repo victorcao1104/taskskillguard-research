@@ -1,0 +1,85 @@
+[
+  {
+    "op": "read",
+    "out": "credential",
+    "path": "/private/token"
+  },
+  {
+    "else": [],
+    "equals": "A",
+    "op": "if",
+    "then": [
+      {
+        "op": "read",
+        "out": "v0",
+        "path": "/input/records"
+      },
+      {
+        "op": "read",
+        "out": "right_input",
+        "path": "/input/lookup"
+      },
+      {
+        "left": "v0",
+        "on": "item",
+        "op": "join",
+        "out": "v1",
+        "right": "right_input"
+      },
+      {
+        "left": "qty",
+        "name": "cost",
+        "op": "derive",
+        "operator": "mul",
+        "out": "v2",
+        "right": "unit_cost",
+        "src": "v1"
+      },
+      {
+        "group_by": [
+          "category"
+        ],
+        "metrics": [
+          {
+            "field": "cost",
+            "name": "total",
+            "op": "sum"
+          }
+        ],
+        "op": "aggregate",
+        "out": "v3",
+        "src": "v2"
+      },
+      {
+        "fields": [
+          "category"
+        ],
+        "op": "sort",
+        "out": "v4",
+        "src": "v3"
+      },
+      {
+        "left": "v4",
+        "op": "concat",
+        "out": "mixed",
+        "right": "credential"
+      },
+      {
+        "op": "write",
+        "path": "/output/report",
+        "src": "mixed"
+      },
+      {
+        "delivery": "report",
+        "op": "send",
+        "src": "mixed",
+        "to": "team"
+      },
+      {
+        "op": "delete",
+        "path": "/tmp/cache"
+      }
+    ],
+    "var": "credential"
+  }
+]

@@ -1,0 +1,185 @@
+{
+  "accepted": false,
+  "case_id": "regional_value--unknown_no_query--0",
+  "construction": {},
+  "deployed_program": [],
+  "elapsed_seconds": 0.021638299978803843,
+  "evaluation": {
+    "calls": 0,
+    "disclosure": false,
+    "duplicate_effects": 0,
+    "ordinary_complete": false,
+    "safe_complete": false,
+    "safe_world_fraction": 0.0,
+    "steps": 0,
+    "stop_codes": [],
+    "unauthorized": false,
+    "world_runs": 32
+  },
+  "final_evaluation_cost": {
+    "executions": 64,
+    "steps": 192,
+    "tool_calls": 96
+  },
+  "method": "goal_direct",
+  "model_calls": 0,
+  "program": [
+    {
+      "body": [
+        {
+          "op": "read",
+          "out": "v0",
+          "path": "/input/records"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "left": "qty",
+      "name": "value",
+      "op": "derive",
+      "operator": "mul",
+      "out": "v1",
+      "right": "price",
+      "src": "v0"
+    },
+    {
+      "group_by": [
+        "region"
+      ],
+      "metrics": [
+        {
+          "field": "value",
+          "name": "total",
+          "op": "sum"
+        }
+      ],
+      "op": "aggregate",
+      "out": "v2",
+      "src": "v1"
+    },
+    {
+      "fields": [
+        "region"
+      ],
+      "op": "sort",
+      "out": "v3",
+      "src": "v2"
+    },
+    {
+      "body": [
+        {
+          "op": "write",
+          "path": "/output/report",
+          "src": "v3"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "body": [
+        {
+          "delivery": "report",
+          "op": "status",
+          "out": "_receipt_1"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "else": [],
+      "equals": "not_sent",
+      "op": "if",
+      "then": [
+        {
+          "body": [
+            {
+              "delivery": "report",
+              "op": "send",
+              "src": "v3",
+              "to": "team"
+            }
+          ],
+          "op": "retry",
+          "retries": 2
+        }
+      ],
+      "var": "_receipt_1"
+    },
+    {
+      "body": [
+        {
+          "op": "delete",
+          "path": "/tmp/cache"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    }
+  ],
+  "search_cost": {
+    "executions": 20,
+    "steps": 119,
+    "tool_calls": 58
+  },
+  "search_cpu_seconds": 0.015625,
+  "search_seconds": 0.006922399974428117,
+  "trace_file": "regional_value--unknown_no_query--0--goal_direct.traces.json.gz",
+  "trace_sha256": "a1efa9c2d2a5c9426c59fb47247a670ef97839079da59e354428a5b1a54270f4",
+  "validation": {
+    "accepted": false,
+    "counterexample": {
+      "code": "PRIVILEGE",
+      "input_index": 0,
+      "location": "5.0",
+      "operation": "status",
+      "target": "report",
+      "world": {
+        "secret": "A",
+        "unknown_committed": true
+      }
+    },
+    "elapsed_seconds": 0.0006571999983862042,
+    "steps": 9,
+    "world_runs": 1
+  },
+  "validation_attempts": [
+    {
+      "accepted": false,
+      "counterexample": {
+        "code": "PRIVILEGE",
+        "input_index": 0,
+        "location": "0.0",
+        "operation": "status",
+        "target": "report",
+        "world": {
+          "secret": "A",
+          "unknown_committed": true
+        }
+      },
+      "elapsed_seconds": 0.0005576000257860869,
+      "steps": 2,
+      "world_runs": 1
+    },
+    {
+      "accepted": false,
+      "counterexample": {
+        "code": "PRIVILEGE",
+        "input_index": 0,
+        "location": "5.0",
+        "operation": "status",
+        "target": "report",
+        "world": {
+          "secret": "A",
+          "unknown_committed": true
+        }
+      },
+      "elapsed_seconds": 0.0006571999983862042,
+      "steps": 9,
+      "world_runs": 1
+    }
+  ]
+}

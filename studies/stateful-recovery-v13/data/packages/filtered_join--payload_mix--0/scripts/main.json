@@ -1,0 +1,89 @@
+[
+  {
+    "op": "read",
+    "out": "v0",
+    "path": "/input/records"
+  },
+  {
+    "op": "read",
+    "out": "right_input",
+    "path": "/input/lookup"
+  },
+  {
+    "left": "v0",
+    "on": "item",
+    "op": "join",
+    "out": "v1",
+    "right": "right_input"
+  },
+  {
+    "cmp": "ge",
+    "field": "qty",
+    "op": "filter",
+    "out": "v2",
+    "src": "v1",
+    "value": 3
+  },
+  {
+    "cmp": "ne",
+    "field": "region",
+    "op": "filter",
+    "out": "v3",
+    "src": "v2",
+    "value": "W"
+  },
+  {
+    "group_by": [
+      "category"
+    ],
+    "metrics": [
+      {
+        "field": "qty",
+        "name": "min_qty",
+        "op": "min"
+      },
+      {
+        "field": "qty",
+        "name": "max_qty",
+        "op": "max"
+      }
+    ],
+    "op": "aggregate",
+    "out": "v4",
+    "src": "v3"
+  },
+  {
+    "fields": [
+      "category"
+    ],
+    "op": "sort",
+    "out": "v5",
+    "src": "v4"
+  },
+  {
+    "op": "read",
+    "out": "credential",
+    "path": "/private/token"
+  },
+  {
+    "left": "v5",
+    "op": "concat",
+    "out": "mixed",
+    "right": "credential"
+  },
+  {
+    "op": "write",
+    "path": "/output/report",
+    "src": "mixed"
+  },
+  {
+    "delivery": "report",
+    "op": "send",
+    "src": "mixed",
+    "to": "team"
+  },
+  {
+    "op": "delete",
+    "path": "/tmp/cache"
+  }
+]

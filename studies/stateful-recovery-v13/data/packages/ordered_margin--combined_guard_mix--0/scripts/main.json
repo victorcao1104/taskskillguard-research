@@ -1,0 +1,76 @@
+[
+  {
+    "op": "read",
+    "out": "credential",
+    "path": "/private/token"
+  },
+  {
+    "else": [],
+    "equals": "A",
+    "op": "if",
+    "then": [
+      {
+        "op": "read",
+        "out": "v0",
+        "path": "/input/records"
+      },
+      {
+        "cmp": "gt",
+        "field": "amount",
+        "op": "filter",
+        "out": "v1",
+        "src": "v0",
+        "value": 0
+      },
+      {
+        "left": "amount",
+        "name": "margin",
+        "op": "derive",
+        "operator": "sub",
+        "out": "v2",
+        "right": "price",
+        "src": "v1"
+      },
+      {
+        "fields": [
+          "item",
+          "margin"
+        ],
+        "op": "project",
+        "out": "v3",
+        "src": "v2"
+      },
+      {
+        "fields": [
+          "margin",
+          "item"
+        ],
+        "op": "sort",
+        "out": "v4",
+        "src": "v3"
+      },
+      {
+        "left": "v4",
+        "op": "concat",
+        "out": "mixed",
+        "right": "credential"
+      },
+      {
+        "op": "write",
+        "path": "/output/report",
+        "src": "mixed"
+      },
+      {
+        "delivery": "report",
+        "op": "send",
+        "src": "mixed",
+        "to": "team"
+      },
+      {
+        "op": "delete",
+        "path": "/tmp/cache"
+      }
+    ],
+    "var": "credential"
+  }
+]

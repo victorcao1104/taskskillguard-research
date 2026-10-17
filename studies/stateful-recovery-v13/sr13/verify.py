@@ -32,6 +32,13 @@ def check(program,case,validation_inputs,*,max_steps=100000):
                 cex={'code':'HISTORICAL_VIOLATION' if score['prior_or_current_violations'] else 'DUPLICATE_EFFECT' if score['duplicate_effects'] else 'GOAL_MISMATCH',
                      'pending':score['pending'],'input_index':index,'world':context,
                      'expected_output':expected(case['task'],inputs)}
+                if score['duplicate_effects']:
+                    counts={}
+                    for event in result['world']['trace']:
+                        if event.get('status')=='success' and event.get('op') in {'write','send','delete'}:
+                            key=(event['op'],event.get('target'));counts[key]=counts.get(key,0)+1
+                    cex['repeated_successful_effects']=[{'operation':op,'target':target,'count':n}
+                        for (op,target),n in counts.items() if n>1]
             public=_visible(result['world'])
             key=context['unknown_committed']
             if key in paired and paired[key]!=public:

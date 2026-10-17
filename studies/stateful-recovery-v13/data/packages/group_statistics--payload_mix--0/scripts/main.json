@@ -1,0 +1,66 @@
+[
+  {
+    "op": "read",
+    "out": "v0",
+    "path": "/input/records"
+  },
+  {
+    "group_by": [
+      "region"
+    ],
+    "metrics": [
+      {
+        "field": "item",
+        "name": "count",
+        "op": "count"
+      },
+      {
+        "field": "amount",
+        "name": "total",
+        "op": "sum"
+      },
+      {
+        "field": "amount",
+        "name": "largest",
+        "op": "max"
+      }
+    ],
+    "op": "aggregate",
+    "out": "v1",
+    "src": "v0"
+  },
+  {
+    "fields": [
+      "region"
+    ],
+    "op": "sort",
+    "out": "v2",
+    "src": "v1"
+  },
+  {
+    "op": "read",
+    "out": "credential",
+    "path": "/private/token"
+  },
+  {
+    "left": "v2",
+    "op": "concat",
+    "out": "mixed",
+    "right": "credential"
+  },
+  {
+    "op": "write",
+    "path": "/output/report",
+    "src": "mixed"
+  },
+  {
+    "delivery": "report",
+    "op": "send",
+    "src": "mixed",
+    "to": "team"
+  },
+  {
+    "op": "delete",
+    "path": "/tmp/cache"
+  }
+]

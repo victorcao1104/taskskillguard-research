@@ -1,0 +1,324 @@
+{
+  "accepted": false,
+  "case_id": "two_stage_arithmetic--prior_leak--0",
+  "construction": {
+    "changes": [
+      "backward_slice"
+    ],
+    "contract": {
+      "artifact_verified": false,
+      "barriers": [
+        "IRREVERSIBLE_PREFIX_VIOLATION"
+      ],
+      "calls_remaining": 29,
+      "confirmed_deliveries": [],
+      "dependency_cut": {
+        "locations": [
+          "0"
+        ],
+        "meaning": "These source-derived dependencies are untrusted hints, not recovery goals.",
+        "variables": [
+          "credential"
+        ]
+      },
+      "must_query": [],
+      "pending": [
+        "artifact",
+        "delete:/tmp/cache",
+        "delivery:report"
+      ],
+      "permission_rule": "No new grants; candidates and original source have identical trust.",
+      "reusable_result_variables": []
+    },
+    "program": [
+      {
+        "body": [
+          {
+            "op": "read",
+            "out": "v0",
+            "path": "/input/records"
+          }
+        ],
+        "op": "retry",
+        "retries": 2
+      },
+      {
+        "body": [
+          {
+            "op": "read",
+            "out": "right_input",
+            "path": "/input/lookup"
+          }
+        ],
+        "op": "retry",
+        "retries": 2
+      },
+      {
+        "left": "v0",
+        "on": "item",
+        "op": "join",
+        "out": "v1",
+        "right": "right_input"
+      },
+      {
+        "cmp": "gt",
+        "field": "qty",
+        "op": "filter",
+        "out": "v2",
+        "src": "v1",
+        "value": 1
+      },
+      {
+        "left": "qty",
+        "name": "gross",
+        "op": "derive",
+        "operator": "mul",
+        "out": "v3",
+        "right": "price",
+        "src": "v2"
+      },
+      {
+        "left": "gross",
+        "name": "net",
+        "op": "derive",
+        "operator": "sub",
+        "out": "v4",
+        "right": "unit_cost",
+        "src": "v3"
+      },
+      {
+        "group_by": [],
+        "metrics": [
+          {
+            "field": "net",
+            "name": "net_total",
+            "op": "sum"
+          },
+          {
+            "field": "item",
+            "name": "count",
+            "op": "count"
+          }
+        ],
+        "op": "aggregate",
+        "out": "v5",
+        "src": "v4"
+      },
+      {
+        "body": [
+          {
+            "op": "write",
+            "path": "/output/report",
+            "src": "v5"
+          }
+        ],
+        "op": "retry",
+        "retries": 2
+      },
+      {
+        "body": [
+          {
+            "delivery": "report",
+            "op": "send",
+            "src": "v5",
+            "to": "team"
+          }
+        ],
+        "op": "retry",
+        "retries": 2
+      },
+      {
+        "body": [
+          {
+            "op": "delete",
+            "path": "/tmp/cache"
+          }
+        ],
+        "op": "retry",
+        "retries": 2
+      }
+    ]
+  },
+  "deployed_program": [],
+  "elapsed_seconds": 0.005157600011443719,
+  "evaluation": {
+    "calls": 0,
+    "disclosure": true,
+    "duplicate_effects": 0,
+    "ordinary_complete": false,
+    "safe_complete": false,
+    "safe_world_fraction": 0.0,
+    "steps": 0,
+    "stop_codes": [],
+    "unauthorized": false,
+    "world_runs": 16
+  },
+  "final_evaluation_cost": {
+    "executions": 32,
+    "steps": 16,
+    "tool_calls": 16
+  },
+  "method": "contract_source",
+  "model_calls": 0,
+  "program": [
+    {
+      "body": [
+        {
+          "op": "read",
+          "out": "v0",
+          "path": "/input/records"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "body": [
+        {
+          "op": "read",
+          "out": "right_input",
+          "path": "/input/lookup"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "left": "v0",
+      "on": "item",
+      "op": "join",
+      "out": "v1",
+      "right": "right_input"
+    },
+    {
+      "cmp": "gt",
+      "field": "qty",
+      "op": "filter",
+      "out": "v2",
+      "src": "v1",
+      "value": 1
+    },
+    {
+      "left": "qty",
+      "name": "gross",
+      "op": "derive",
+      "operator": "mul",
+      "out": "v3",
+      "right": "price",
+      "src": "v2"
+    },
+    {
+      "left": "gross",
+      "name": "net",
+      "op": "derive",
+      "operator": "sub",
+      "out": "v4",
+      "right": "unit_cost",
+      "src": "v3"
+    },
+    {
+      "group_by": [],
+      "metrics": [
+        {
+          "field": "net",
+          "name": "net_total",
+          "op": "sum"
+        },
+        {
+          "field": "item",
+          "name": "count",
+          "op": "count"
+        }
+      ],
+      "op": "aggregate",
+      "out": "v5",
+      "src": "v4"
+    },
+    {
+      "body": [
+        {
+          "op": "write",
+          "path": "/output/report",
+          "src": "v5"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "body": [
+        {
+          "delivery": "report",
+          "op": "send",
+          "src": "v5",
+          "to": "team"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    },
+    {
+      "body": [
+        {
+          "op": "delete",
+          "path": "/tmp/cache"
+        }
+      ],
+      "op": "retry",
+      "retries": 2
+    }
+  ],
+  "search_cost": {
+    "executions": 8,
+    "steps": 22,
+    "tool_calls": 12
+  },
+  "search_cpu_seconds": 0.0,
+  "search_seconds": 0.0022016000002622604,
+  "trace_file": "two_stage_arithmetic--prior_leak--0--contract_source.traces.json.gz",
+  "trace_sha256": "090252008c20f620cb2b962348ff8a1b551403cef016df2256f3228786c53ba6",
+  "validation": {
+    "accepted": false,
+    "counterexample": {
+      "code": "HISTORICAL_VIOLATION",
+      "expected_output": [
+        {
+          "count": 6,
+          "net_total": 135
+        }
+      ],
+      "input_index": 0,
+      "pending": [],
+      "world": {
+        "secret": "A",
+        "unknown_committed": true
+      }
+    },
+    "elapsed_seconds": 0.000745400000596419,
+    "steps": 15,
+    "world_runs": 1
+  },
+  "validation_attempts": [
+    {
+      "accepted": false,
+      "counterexample": {
+        "code": "HISTORICAL_VIOLATION",
+        "expected_output": [
+          {
+            "count": 6,
+            "net_total": 135
+          }
+        ],
+        "input_index": 0,
+        "pending": [],
+        "world": {
+          "secret": "A",
+          "unknown_committed": true
+        }
+      },
+      "elapsed_seconds": 0.000745400000596419,
+      "steps": 15,
+      "world_runs": 1
+    }
+  ]
+}

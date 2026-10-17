@@ -1,0 +1,91 @@
+[
+  {
+    "op": "read",
+    "out": "credential",
+    "path": "/private/token"
+  },
+  {
+    "else": [],
+    "equals": "A",
+    "op": "if",
+    "then": [
+      {
+        "op": "read",
+        "out": "v0",
+        "path": "/input/records"
+      },
+      {
+        "op": "read",
+        "out": "right_input",
+        "path": "/input/lookup"
+      },
+      {
+        "left": "v0",
+        "on": "item",
+        "op": "join",
+        "out": "v1",
+        "right": "right_input"
+      },
+      {
+        "cmp": "gt",
+        "field": "qty",
+        "op": "filter",
+        "out": "v2",
+        "src": "v1",
+        "value": 1
+      },
+      {
+        "left": "qty",
+        "name": "gross",
+        "op": "derive",
+        "operator": "mul",
+        "out": "v3",
+        "right": "price",
+        "src": "v2"
+      },
+      {
+        "left": "gross",
+        "name": "net",
+        "op": "derive",
+        "operator": "sub",
+        "out": "v4",
+        "right": "unit_cost",
+        "src": "v3"
+      },
+      {
+        "group_by": [],
+        "metrics": [
+          {
+            "field": "net",
+            "name": "net_total",
+            "op": "sum"
+          },
+          {
+            "field": "item",
+            "name": "count",
+            "op": "count"
+          }
+        ],
+        "op": "aggregate",
+        "out": "v5",
+        "src": "v4"
+      },
+      {
+        "op": "write",
+        "path": "/output/report",
+        "src": "v5"
+      },
+      {
+        "delivery": "report",
+        "op": "send",
+        "src": "v5",
+        "to": "team"
+      },
+      {
+        "op": "delete",
+        "path": "/tmp/cache"
+      }
+    ],
+    "var": "credential"
+  }
+]

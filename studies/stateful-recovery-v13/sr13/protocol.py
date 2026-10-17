@@ -35,6 +35,11 @@ def payload(case,inputs,method,attempts,iteration):
       'contract':'Construct a continuation subject to the residual effect contract; the compiler will lower receipt guards and slice unused computations.'}
     family='contract' if method in ABLATIONS else method
     obj={'instruction':instructions[family],'task':case['task'],'state':observe(case,inputs),
+         'common_execution_contract':{
+             'exactly_once_effects':'Across the real prefix and continuation together, at most one successful write per path, one successful delete per path, and one send per delivery ID. Repeating an idempotent write or delete also fails this study rule.',
+             'validation_isolation':'Previous candidates were tested in disposable copies. NONE of their effects changed the CURRENT state above. Counterexample world flags are simulation settings, not evidence that an earlier candidate actually sent anything.',
+             'state_authority':'Use the CURRENT state receipts, files, variables and deletes to infer completed work. Only a permitted status operation can resolve an unknown receipt.',
+             'possible_faults':'Confirmed no-effect transient failures can occur during recovery; bounded retry is available. An uncertain effect is not a confirmed failure.'},
          'tools':TOOLS,'iteration':iteration,'limits':{'total_candidates':3,'max_actions_per_block':32,'runtime_steps':192},
          'note':'query describes required table content, not a supplied tool or replacement script; all operations must use tools listed here.'}
     if method!='replan':obj['original_skill']={'SKILL.md':case.get('skill_md','Run scripts/main.json to perform the task.'),'program':case['skill']}

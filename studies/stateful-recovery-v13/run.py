@@ -27,16 +27,16 @@ def freeze():
         'main_selection':MAIN_SELECTION,'models':MODELS,'methods':MODEL_METHODS,'replicates':3,
         'max_candidates':3,'max_output_tokens':MAX_OUTPUT,'input_byte_reservation_cap':MAX_INPUT_BYTES,
         'main_max_requests_per_model':1368,'main_reservation_bound_usd':17.52408,
-        'development_max_requests_per_model':11,'development_reservation_bound_usd':.14091,
+        'development_max_requests_per_model':22,'development_reservation_bound_usd':.28182,
         'adaptive_max_requests_per_model':132,'adaptive_reservation_bound_usd':1.69092,
-        'combined_worst_case_bound_usd':19.35591,'new_cap_usd':20,
+        'combined_worst_case_bound_usd':19.49682,'new_cap_usd':20,
         'validation_seeds':[101,102,103],'final_seeds':list(range(1001,1009)),
-        'test_cases_generated':False,'notes':'Method and generator rules frozen before heldout case materialization. Developer-authored structural holdouts; not blind human validation.'}
-    save(D/'provenance/method_freeze.json',manifest);print(json.dumps({'frozen_sources':len(manifest['source_hashes']),'planned_worst_usd':19.35591}))
+        'test_cases_generated':(D/'data/cases.json').exists(),'notes':'Core/generator frozen in v1 before heldout materialization. Protocol v2 clarification after development and offline runs, before paid main runs; see protocol_amendment.md. Developer-authored holdouts, not blind validation.'}
+    save(D/'provenance/method_freeze_v2.json',manifest);print(json.dumps({'frozen_sources':len(manifest['source_hashes']),'planned_worst_usd':19.49682}))
 
 
 def assert_frozen():
-    f=read(D/'provenance/method_freeze.json')
+    f=read(D/'provenance/method_freeze_v2.json')
     if source_hashes(D)!=f['source_hashes']:raise ValueError('FROZEN_SOURCE_CHANGED')
     return f
 
@@ -91,7 +91,7 @@ def offline(output=None):
 def model_run(env_file,*,cached=False,development=False,output=None,campaign='main',cases_override=None):
     assert_frozen();b,a=budget();provider=Provider(D/'api',b,None if cached else load_key(env_file))
     if development:
-        cases=[make_case('dev_sum','partial_write')];methods=('repair','replan','plain_cegis','contract');reps=1;campaign='development'
+        cases=[make_case('dev_sum','partial_write')];methods=('repair','replan','plain_cegis','contract');reps=1;campaign='development_v2'
     elif cases_override is not None:
         cases=cases_override;methods=('repair','replan','plain_cegis','contract');reps=2;campaign='adaptive'
     else:
