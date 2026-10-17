@@ -9,9 +9,9 @@ from tsg.budget_v4 import BudgetV4
 from tsg.models import load_key
 from tsg.models_v3 import ClientV3,validate_record
 from run_phase5 import price_job,dispatch_once
-from .protocol import SCHEMA,SYSTEM,MODELS,parse
+from .protocol import SCHEMA,SYSTEM,SYSTEM_MAIN,MODELS,parse
 CAP=42.781273975000005
-INPUT_CAP=12000
+INPUT_CAP=14000
 OUTPUT_CAP=2000
 
 def immutable(path,value):
@@ -39,7 +39,7 @@ def request_job(model,prompt,*,method,case_id,replicate,iteration,campaign):
     if model not in MODELS:raise ValueError('UNAUTHORIZED_MODEL')
     name=f'{campaign}--{case_id}--{method}--{model}--r{replicate}--i{iteration}'
     nonce=int(hashlib.sha256(name.encode()).hexdigest()[:12],16)
-    j=price_job({'job_id':name,'model':model,'system':SYSTEM,'prompt':prompt,'schema':SCHEMA,'max_output':OUTPUT_CAP,'replicate':nonce})
+    j=price_job({'job_id':name,'model':model,'system':SYSTEM if campaign=='development' else SYSTEM_MAIN,'prompt':prompt,'schema':SCHEMA,'max_output':OUTPUT_CAP,'replicate':nonce})
     if j['input_byte_bound']>INPUT_CAP:raise ValueError('INPUT_BYTE_CAP')
     return j
 
