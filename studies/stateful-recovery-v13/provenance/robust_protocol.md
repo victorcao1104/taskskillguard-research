@@ -1,0 +1,11 @@
+# Outcome-blind transport sensitivity
+
+The strict main experiment exposes an output-format confound. Some complete JSON arrays have one stray final brace; strict parsing rejects the whole candidate. Other completed API envelopes contain multiple different assistant output texts, which the inherited strict client rejects. Avoiding model requests can therefore produce an apparent advantage unrelated to recovery reasoning.
+
+The additional matched grid covers all 24 original main cases, all eight methods including ablations, both models and three separate requests/runs (1,152 episodes). It uses corrected physical histories. The shared adapter has two predefined rules: if multiple output text is the only envelope error, select the last complete output text; and accept a complete program array followed only by one extra `}` or comma. Duplicate keys, additional trailing program content, incomplete output, refusal and other envelope errors remain rejected. It never examines task success to choose a message, changes an action, inserts a read, grants a permission or relaxes verification. Raw responses remain unchanged and each normalization is logged in request metadata.
+
+This is a post-observation sensitivity study, not a newly blind benchmark. All eight methods receive identical normalization. The original strict results and ablations remain; the sensitivity checks whether advantages over ordinary repair/replanning survive a less brittle transport interface. It does not establish that the adapter or the prompt is optimal, and the same four ablations are included. The deterministic source-free compiler remains the strongest control regardless of model formatting.
+
+The new worst-case reservation bound is $17.52408; the runner admits the grid only when this amount plus previous conservative campaign exposure remains below the same $20 cap. No second ledger or extra budget is created.
+
+After the normalized main acquisition, the same six selected adaptive cases may be rerun for the four main methods, both models and two repeats (96 episodes) only if their full $1.69092 reservation bound still fits the remaining budget. Admission depends only on available budget, not on whether main results favor the method.
