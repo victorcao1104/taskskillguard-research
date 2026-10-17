@@ -9,3 +9,5 @@
 - Task 1: complete. Missing-module regression observed, then four goal tests passed, including nonunique answers and independent checker differential tests.
 - Task 2: core complete. Runtime and certificate tests were written and observed failing before implementation. Full suite: 13 passed. Certificates bind input/goal/value; the state module rechecks rather than trusting saved metadata.
 - Baseline: all 66 v13 tests passed before new implementation. v13 files remain unchanged.
+- Task 3: data, controls and shared verifier implemented after red tests. 20 tests pass. Original helper generation does not import the compiler; independent truth checks feasibility. Validation includes six random inputs plus reversal, ID renaming, ties/boundary values and decoy records (18 inputs); final 16 seeds and 32 larger stress inputs are separate.
+- Ruling: main deterministic grid includes a prior-leak condition in addition to the twelve conditions in the design, so historical safety accounting remains directly testable. Main 24-case selection is unchanged. Runtime certificates validate values on each current input, not global equivalence of an arbitrary saved computation.
