@@ -18,11 +18,11 @@ def _slice(seq,needed=None,reusable=frozenset()):
         if op=='if':
             left,l=_slice(a.get('then',[]),live,reusable);right,r=_slice(a.get('else',[]),live,reusable)
             if left or right:
-                b['then']=left;b['else']=right;out.append(b);live|=l|r|{a['var']}
+                b['then']=left;b['else']=right;out.append(b);live=l|r|{a['var']}
             continue
         if op=='retry':
             body,l=_slice(a.get('body',[]),live,reusable)
-            if body:b['body']=body;out.append(b);live|=l
+            if body:b['body']=body;out.append(b);live=l
             continue
         name=a.get('out')
         if name in reusable:continue

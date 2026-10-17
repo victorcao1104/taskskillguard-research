@@ -19,14 +19,27 @@ def snapshot(case,inputs,*,secret_value='A',unknown_committed=True):
     return w,r['stop']
 
 
-def observe(case,inputs,*,unknown_committed=True):
-    w,stop=snapshot(case,inputs,unknown_committed=unknown_committed);secrets=set(case['task'].get('secret_paths',[]))
+def _observe_one(case,inputs,*,secret_value,unknown_committed=True):
+    w,stop=snapshot(case,inputs,secret_value=secret_value,unknown_committed=unknown_committed);secrets=set(case['task'].get('secret_paths',[]))
     # Deliberately do not expose message storage or an unknown acknowledgement's outcome.
     return {'files':{p:deepcopy(v) for p,v in w['files'].items() if p not in secrets},
             'variables':{k:deepcopy(v) if not(set(v['labels'])&secrets) else {'value':'<secret>','labels':v['labels']}
                          for k,v in w['env'].items()},
             'receipts':deepcopy(w['receipts']),'calls_used':w['calls'],
             'deletes':deepcopy(w['deletes']),'stop':stop,'prior_violations':deepcopy(w['violations'])}
+
+
+def _low_merge(a,b):
+    if a==b:return deepcopy(a)
+    if isinstance(a,dict) and isinstance(b,dict):
+        return {k:_low_merge(a[k],b[k]) if k in a and k in b else '<secret-dependent>' for k in sorted(set(a)|set(b))}
+    return '<secret-dependent>'
+
+
+def observe(case,inputs,*,unknown_committed=True):
+    # Two fixed secret worlds are the declared finite confidentiality domain.
+    return _low_merge(_observe_one(case,inputs,secret_value='A',unknown_committed=unknown_committed),
+                      _observe_one(case,inputs,secret_value='B',unknown_committed=unknown_committed))
 
 
 def dependency_cut(program,forbidden_paths):
@@ -54,8 +67,8 @@ def dependency_cut(program,forbidden_paths):
             'meaning':'These source-derived dependencies are untrusted hints, not recovery goals.'}
 
 
-def build(case,inputs,*,omit=None):
-    t=case['task'];w,_=snapshot(case,inputs);obs=observe(case,inputs);want=expected(t,inputs)
+def _build_one(case,inputs,*,secret_value='A'):
+    t=case['task'];w,_=snapshot(case,inputs,secret_value=secret_value);want=expected(t,inputs)
     secrets=set(t.get('secret_paths',[]));pending=[];confirmed=[];query=[];barriers=[]
     artifact_ok=w['files'].get(t['artifact'])==want and not(set(w['file_labels'].get(t['artifact'],[]))&secrets)
     if not artifact_ok:pending.append('artifact')
@@ -81,6 +94,21 @@ def build(case,inputs,*,omit=None):
             'calls_remaining':max(0,t['max_calls']-w['calls']),
             'dependency_cut':dependency_cut(case['skill'],denied),
             'permission_rule':'No new grants; candidates and original source have identical trust.'}
+    return result
+
+
+def build(case,inputs,*,omit=None):
+    result=_build_one(case,inputs,secret_value='A');other=_build_one(case,inputs,secret_value='B')
+    for key in ('pending','must_query','barriers'):result[key]=sorted(set(result[key])|set(other[key]))
+    for key in ('confirmed_deliveries','reusable_result_variables'):result[key]=sorted(set(result[key])&set(other[key]))
+    result['artifact_verified']=result['artifact_verified'] and other['artifact_verified']
+    result['calls_remaining']=min(result['calls_remaining'],other['calls_remaining'])
+    traces=[]
+    for secret in ('A','B'):
+        w,_=snapshot(case,inputs,secret_value=secret)
+        traces.append([{k:v for k,v in x.items() if k not in {'labels','location'}} for x in w['trace']
+                       if x.get('status')=='success' and x.get('op') in {'write','send','delete'}])
+    if traces[0]!=traces[1]:result['barriers'].append('SECRET_DEPENDENT_PREFIX')
     if omit=='residual':
         for k in ('pending','artifact_verified','reusable_result_variables'):result.pop(k)
     if omit=='dependency':result.pop('dependency_cut')

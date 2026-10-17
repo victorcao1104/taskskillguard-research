@@ -32,3 +32,20 @@ def test_direct_constructor_uses_new_inputs_not_fixed_output():
     c=case();f2={**files(),'/input/sales':[{'amount':27}]}
     result=offline_trial('goal_direct',c,[files()],[f2])
     assert result['evaluation']['safe_complete']
+
+
+def test_strong_constructor_falls_back_from_coincidental_cache_match():
+    c=case([{'op':'const','value':[{'total':11}],'out':'spoof'},
+            {'op':'read','path':'/denied','out':'bad'}])
+    f2={**files(),'/input/sales':[{'amount':16}]}
+    r=offline_trial('goal_direct',c,[files(),f2],[f2])
+    assert r['evaluation']['safe_complete']
+    assert len(r['validation_attempts'])==2
+
+
+def test_delete_continue_resumes_executed_else_branch():
+    p=[{'op':'const','value':False,'out':'gate'},
+       {'op':'if','var':'gate','equals':True,'then':[],
+        'else':[{'op':'read','path':'/denied','out':'bad'},*plan()[:2]]},*plan()[2:]]
+    c=case(p);c['skill']=p
+    assert offline_trial('delete_continue',c,[files()],[files()])['evaluation']['safe_complete']

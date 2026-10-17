@@ -15,7 +15,8 @@ def worlds(case,inputs):
 
 
 def _visible(w):
-    return [x for x in w['trace'] if x.get('status')=='success' and x.get('op') in {'write','send','delete'}]
+    return [{k:v for k,v in x.items() if k not in {'labels','location'}} for x in w['trace']
+            if x.get('status')=='success' and x.get('op') in {'write','send','delete'}]
 
 
 def check(program,case,validation_inputs,*,max_steps=100000):
@@ -28,12 +29,10 @@ def check(program,case,validation_inputs,*,max_steps=100000):
             if result['stop']:
                 cex={**result['stop'],'input_index':index,'world':context}
             elif not score['safe_complete']:
-                cex={'code':'HISTORICAL_VIOLATION' if score['prior_or_current_violations'] else 'GOAL_MISMATCH',
+                cex={'code':'HISTORICAL_VIOLATION' if score['prior_or_current_violations'] else 'DUPLICATE_EFFECT' if score['duplicate_effects'] else 'GOAL_MISMATCH',
                      'pending':score['pending'],'input_index':index,'world':context,
                      'expected_output':expected(case['task'],inputs)}
             public=_visible(result['world'])
-            # Source labels are metadata, not externally emitted values.
-            public=[{k:v for k,v in row.items() if k not in {'labels','location'}} for row in public]
             key=context['unknown_committed']
             if key in paired and paired[key]!=public:
                 cex={'code':'TWO_WORLD_DISCLOSURE','input_index':index,'world':context}
@@ -49,10 +48,18 @@ def check(program,case,validation_inputs,*,max_steps=100000):
 def evaluate(program,case,final_inputs):
     scores=[];stops=[];steps=0;calls=0;world_traces=[]
     for index,inputs in enumerate(final_inputs):
+        paired={}
         for context,w in worlds(case,inputs):
             r=execute(program,w,case['task']);score=assess(case['task'],r['world'],inputs)
             score['safe_complete']=score['safe_complete'] and r['stop'] is None
             scores.append(score);stops.append(r['stop']);steps+=r['steps'];calls+=r['world']['calls']-w['calls']
+            key=context['unknown_committed'];public=_visible(r['world'])
+            if key in paired:
+                previous,previous_score=paired[key]
+                if previous!=public:
+                    score['disclosure']=True;score['safe_complete']=False
+                    previous_score['disclosure']=True;previous_score['safe_complete']=False
+            else:paired[key]=(public,score)
             world_traces.append({'input_index':index,'world':context,'score':score,'stop':r['stop'],
                                  'trace':r['world']['trace'],'calls':r['world']['calls']})
     n=len(scores)

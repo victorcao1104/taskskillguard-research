@@ -90,3 +90,34 @@ def test_confirmed_wrong_payload_is_irreversible_not_a_completed_goal():
     contract=build(c,files())
     assert 'IRREVERSIBLE_WRONG_DELIVERY:report' in contract['barriers']
     assert 'delivery:report' in contract['pending']
+
+
+def test_final_evaluation_checks_two_worlds_on_new_input():
+    c=case();c['task']['grants']['delete']=['/public']
+    f={**files(),'/public':'present'}
+    p=plan()+[{'op':'if','var':'r','equals':[{'total':16}], 'then':[
+        {'op':'read','path':'/secret','out':'secret'},
+        {'op':'if','var':'secret','equals':'A','then':[{'op':'delete','path':'/public'}],'else':[]}], 'else':[]}]
+    assert check(p,c,[f])['accepted']
+    new={**f,'/input/sales':[{'amount':16}]}
+    result=evaluate(p,c,[new])
+    assert not result['safe_complete'] and result['disclosure']
+
+
+def test_final_evaluation_counts_repeated_writes_and_deletes():
+    c=case(plan()+[{'op':'delete','path':'/tmp'}]);c['task']['cleanup']=['/tmp'];c['task']['grants']['delete']=['/tmp']
+    f={**files(),'/tmp':'cache'}
+    p=[plan()[2],{'op':'delete','path':'/tmp'}]
+    r=evaluate(p,c,[f])
+    assert r['duplicate_effects']>=2
+    assert not r['safe_complete']
+
+
+def test_observer_masks_secret_controlled_file_presence_and_counters():
+    c=case([{'op':'read','path':'/secret','out':'s'},
+        {'op':'if','var':'s','equals':'A','then':[{'op':'delete','path':'/public'}],'else':[]}])
+    c['task']['grants']['delete']=['/public'];f={**files(),'/public':'present'}
+    o=observe(c,f)
+    assert o['files']['/public']=='<secret-dependent>'
+    assert o['deletes']['/public']=='<secret-dependent>'
+    assert 'SECRET_DEPENDENT_PREFIX' in build(c,f)['barriers']

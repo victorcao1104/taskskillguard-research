@@ -1,6 +1,13 @@
 """Finite interpreter with labeled values, persistent absence and receipt state."""
 from copy import deepcopy
 import json
+from contextvars import ContextVar
+
+METER=ContextVar('sr13_execution_meter',default=None)
+
+
+def start_meter():
+    data={'executions':0,'steps':0,'tool_calls':0};METER.set(data);return data
 
 OPS={'read','filter','project','sort','aggregate','join','derive','const','copy','concat',
      'write','send','delete','status','if','retry'}
@@ -104,7 +111,8 @@ def execute(program,world,task,*,guarded=True):
                     for path in p:
                         w['file_labels'][path]=sorted(set(w['file_labels'].get(path,[]))|branchlabels)
                         w['absence_labels'][path]=sorted(set(w['absence_labels'].get(path,[]))|branchlabels)
-                    run(a.get('then',[]) if v==a['equals'] else a.get('else',[]),branchlabels,loc+'.')
+                    branch='then' if v==a['equals'] else 'else'
+                    run(a.get(branch,[]),branchlabels,loc+'.'+branch+'.')
                     for name in e:
                         if name in w['env']:
                             w['env'][name]['labels']=sorted(set(w['env'][name]['labels'])|branchlabels)
@@ -179,4 +187,7 @@ def execute(program,world,task,*,guarded=True):
     except Halt as exc:stop=exc.detail
     except (KeyError,TypeError,ValueError,IndexError,OverflowError,RecursionError) as exc:
         stop={'code':'MALFORMED_PROGRAM','detail':type(exc).__name__}
+    meter=METER.get()
+    if meter is not None:
+        meter['executions']+=1;meter['steps']+=w['steps']-start_steps;meter['tool_calls']+=w['calls']-world['calls']
     return {'world':w,'stop':stop,'steps':w['steps']-start_steps}
