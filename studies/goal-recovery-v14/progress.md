@@ -6,3 +6,6 @@
 - Pre-flight: goals feed runtime valid() and independent truth checks; runtime feeds certificate/state module; these interfaces will be tested before acquisition.
 - Ruling: use a study-local persistent ledger rather than the shell-specific skill helper, to keep research decisions and corrections in the published artifact.
 - Ruling: user already authorized design implementation and publication; no repeated permission gate. Existing API credential reuse remains authorized; do not reveal or copy credentials into the study.
+- Task 1: complete. Missing-module regression observed, then four goal tests passed, including nonunique answers and independent checker differential tests.
+- Task 2: core complete. Runtime and certificate tests were written and observed failing before implementation. Full suite: 13 passed. Certificates bind input/goal/value; the state module rechecks rather than trusting saved metadata.
+- Baseline: all 66 v13 tests passed before new implementation. v13 files remain unchanged.
