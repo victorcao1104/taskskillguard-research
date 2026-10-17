@@ -1,0 +1,11 @@
+# Physical-history and benign-control amendment
+
+The frozen v2 implementation is retained unchanged. Read-only review reproduced a physical-history defect: `snapshot(..., unknown_committed=False)` removed the delivered message but left its successful-send trace row. The final message-count score could be unchanged while the richer duplicate-effect feedback falsely blamed a second send. A regression with one physical send and two deletes failed before the correction, then passed with only delete identified as repeated. All 57 tests passed afterward.
+
+`state_amendment.py` changes only the uncommitted prefix send row to `not_committed`. It keeps the unknown receipt, attempt costs, step counts, fault indices and all permissions. The original full main campaign is retained. The entire unknown-receipt group (3 cases × 8 methods × 2 models × 3 separate runs = 144 episodes) is rerun, regardless of whether an earlier attempt encountered the defect. The final main table overlays this complete group onto the 1,008 unaffected original episodes. Reused records are not counted as new independent trials. All costs, including superseded requests, remain in the ledger.
+
+Every retained fixed candidate in the affected states is audited under both history semantics. Fixed-program invariance does not establish identical future model proposals; this is why paid whole-group reruns are required. Differences between the old and new sampled runs cannot be attributed solely to the feedback correction.
+
+A separate offline control correction passes an unblocked benign helper through the stop-after-block and delete-after-block baselines. Previously both produced an empty continuation on benign cases, because no blocked location existed. That described stopping everything, not the requested stop-after-block control. The old 756 trials remain available; corrected offline records identify this pass-through explicitly. No model policy, constructor or attack outcome is changed by this benign-control correction.
+
+The corrected runtime and rerun grid are hashed in `state_amendment_freeze.json` before additional paid requests. Its budget check uses original acquisition's actual conservative exposure plus worst-case bounds for all 144 reruns and 96 adaptive episodes. The hard new-campaign cap remains $20.
