@@ -29,9 +29,9 @@ Frozen novel mutants include ordering, stale IDs, boundary conditions, wrong ari
 
 Four structures, four semantic templates each: transformation/aggregation, graph computation, linked report artifacts, simulated service workflows. These are 16 authored templates, clustered into four related structures; do not describe parameter instances as independent tasks.
 Goals describe independently checkable outputs, not a supplied imperative route. Deterministic reference solvers remain strong controls. Reference solvers and candidate implementations are separate; both belong to this benchmark team.
-New inputs: development seeds 101–104; construction validation 201–204; final 1001–1008; scale 2001–2004. Formal main inputs and all source variants freeze before acquisition.
-Source campaign: 16 templates × five source levels × Full/repair plus source-free replan once per template × two models. One run per task/model, prioritizing templates over repeated deterministic successes.
-State campaign: 16 templates × four paired histories × four support levels × two models. Fixed correct computation, effects generation only. Histories: invalid cache / confirmed delivery / unknown with query / same unknown without query. Additional offline paired boundaries and multiple service faults.
+New inputs: development seeds 101â€“104; construction validation 201â€“204; final 1001â€“1008; scale 2001â€“2004. Formal main inputs and all source variants freeze before acquisition.
+Source campaign: 16 templates Ã— five source levels Ã— Full/repair plus source-free replan once per template Ã— two models. One run per task/model, prioritizing templates over repeated deterministic successes.
+State campaign: 16 templates Ã— four paired histories Ã— four support levels Ã— two models. Fixed correct computation, effects generation only. Histories: invalid cache / confirmed delivery / unknown with query / same unknown without query. Additional offline paired boundaries and multiple service faults.
 No real Skills or human annotations.
 
 ## Budget and stopping rules
@@ -54,3 +54,9 @@ Budget curves at one/two candidate slots and zero/one/two model requests use sav
 Create only studies/recovery-mechanisms-v15. Preserve all v14 files and old papers. Archive tag before edits. Report all results and limitations in English machine-readable tables and a readable Chinese report; upload a new tag/release in the same private repository after review.
 No paper rewrite is implied before new results are known. Final conclusions must answer conditional mechanism value rather than advertise Full.
 
+
+## Pre-formal protocol amendment after two pilot batches
+
+The reservation input bound is 24,000 bytes (including the inherited 4,096-byte headroom), not the initial 14,000. Full feedback and candidate source must fit without truncation. The admitted full grid maximum is $13.1712, within the verified remaining allowance; this is a ceiling, not planned expenditure. Two 44-episode pilots are excluded from formal results and retained. Shared schema wording now distinguishes executable effects from prose and makes the fixed-computation invocation explicit. Exact runtime error detail is returned uniformly. No task-specific answer is added. JSON type equality rejects booleans in place of required integers. A concurrent progress-display ledger read was guarded by its existing lock; reservations were already guarded.
+
+Source attacks use one explicit private-read conditional without an else. This is a controlled source-integrity experiment, not evidence of broad attack-family coverage. The unchanged v14 transformation is retained; complex branch reconstruction is outside this primary test.
