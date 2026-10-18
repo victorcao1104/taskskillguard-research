@@ -13,12 +13,12 @@ Synthetic only; original two models; inherited $15.768620025 maximum remaining e
 
 ## Tasks
 
-- [ ] 1. Exact v14 diagnostic replay and source-span constraint intervention. Files causal_v14.py, tests/test_causal.py. Test preservation of non-target text, inactive-only edits, replay and budget-factor independence. Save original, treatment and inverse-injection outcomes, full traces and hashes.
-- [ ] 2. New task suite and execution adapter. Files rm15/tasks.py, solvers.py, runtime.py, tests/test_tasks.py. Sixteen templates with independent oracle versus candidate code; four structures, scale separated; unsafe code never host-executed. Test valid and invalid examples, mutable aliases, partial state and disclosure/permission boundaries.
-- [ ] 3. Source-integrity and state-support protocols. Files rm15/support.py, protocol.py, campaign.py. Test source-only treatment changes, identical source-blind baseline, B informational/C decision/D execution distinction, identical computation in A–D, fault locations and paired unknown observation.
-- [ ] 4. Validation study and stopping grid. Files validation_study.py, boundaries.py. Freeze new mutant families and inputs, run equal count/cost tests and individual transformations. Test incorrect stops separately from API/syntax errors and actual infeasibility.
-- [ ] 5. Budget inheritance and pilot. File rm15/provider.py. Verify ledger prefix, whole-grid worst-case admission, exact caching, no duplicate dispatch and authorized model list. Pilot separate from final.
-- [ ] 6. Freeze, acquire and replay formal campaigns. Save source/input hashes and exact jobs before live work. Run strong controls and both model grids, retain all failures, cached replay all selected programs. Never use final counterexamples to repair main results.
+- [x] 1. Exact v14 diagnostic replay and source-span constraint intervention. Files causal_v14.py, tests/test_causal.py. Test preservation of non-target text, inactive-only edits, replay and budget-factor independence. Save original, treatment and inverse-injection outcomes, full traces and hashes.
+- [x] 2. New task suite and execution adapter. Files rm15/tasks.py, solvers.py, runtime.py, tests/test_tasks.py. Sixteen templates with independent oracle versus candidate code; four structures, scale separated; unsafe code never host-executed. Test valid and invalid examples, mutable aliases, partial state and disclosure/permission boundaries.
+- [x] 3. Source-integrity and state-support protocols. Files rm15/support.py, protocol.py, campaign.py. Test source-only treatment changes, identical source-blind baseline, B informational/C decision/D execution distinction, identical computation in A–D, fault locations and paired unknown observation.
+- [x] 4. Validation study and stopping grid. Files validation_study.py, boundaries.py. Freeze new mutant families and inputs, run equal count/cost tests and individual transformations. Test incorrect stops separately from API/syntax errors and actual infeasibility.
+- [x] 5. Budget inheritance and pilot. File rm15/provider.py. Verify ledger prefix, whole-grid worst-case admission, exact caching, no duplicate dispatch and authorized model list. Pilot separate from final.
+- [x] 6. Freeze, acquire and replay formal campaigns. Save source/input hashes and exact jobs before live work. Run strong controls and both model grids, retain all failures, cached replay all selected programs. Never use final counterexamples to repair main results.
 - [ ] 7. Analyze, review and publish. Files analyze.py, REPORT_ZH.md, README.md, provenance/review.md. Compare paired strata; include cost curves and power limits; fresh final review; verify old evidence unchanged; publish new private version.
 
 ## Review focus

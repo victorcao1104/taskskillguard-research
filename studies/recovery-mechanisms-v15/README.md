@@ -10,12 +10,12 @@ The previous paper and every earlier experiment remain unchanged. Baseline: `74a
 - `reports/REPORT_ZH.md`: readable findings and comparison with v14.
 - `reports/main_summary.json`, `episode_table.csv`: all formal outcomes, paired template contrasts and resource curves.
 - `reports/causal_v14.json`, `causal_summary.json`: exact interventions on seven old failures; no old score is replaced.
-- `reports/validation_summary.json`: 96 authored mutants and equal-count/logical-budget comparisons.
+- `reports/validation_summary.json`: 96 authored variants (77 demonstrated defects, nine unchanged variants, ten untriggered variants) and equal-count/logical-budget comparisons.
 - `results/episodes/`: immutable per-episode candidates, validation, fresh-input and scale evaluations. `pilot*` files are development only; `formal--*` files are the 864 original formal episodes. The enforced state supplement is stored separately under `results/strict_state/episodes/`.
 - `results/diagnostics.json`: cache/receipt interventions, paired stop conditions, reachable service faults and call-budget exhaustion.
 - `results/strong_controls.json.gz`: specialist deterministic solvers, stop and literal-deletion references.
 - `api/requests/`, `api/raw/`, `api/dispatch/`, `api/budget.jsonl`: exact model requests, raw answers, durable dispatch records and inherited conservative cost ledger. No API key is included.
-- `provenance/`: frozen code/input hashes, archive evidence, environment, budget admission and pilot changes.
+- `provenance/`: frozen code/input hashes, archive evidence, environment, budget admission and pilot changes. `environment_incident.md` documents a Windows path failure and sandbox DNS outage; original affected requests and reservations are retained. Controlled-state analysis uses `results/strict_state_recovered/episodes/`, with only transport-affected episodes reacquired under a separately frozen rule. The first strict acquisition stays under `results/strict_state/episodes/`.
 - `semantic_validation_followup.py` and `results/semantic_validation/`: explicitly exploratory semantic boundary tests added after the primary validation design. They do not replace its negative results.
 
 ## What is controlled
@@ -38,12 +38,20 @@ cd studies/recovery-mechanisms-v15
 ../../.venv/Scripts/python verify_replay.py
 ```
 
-`verify_replay.py` executes every saved formal candidate locally, checks the recorded validation/final outcomes and traces, verifies frozen hashes and the inherited ledger prefix, and makes **zero API requests**. It writes a verification report only. The strict supplement has its own cached replay command documented in `strict_state.py --help`. Wall-clock timings are not expected to reproduce exactly; logical steps and outcomes are checked. Dataset generation and bounded execution use no external data.
+`verify_replay.py` executes every saved formal candidate locally, checks the recorded validation/final outcomes and traces, verifies frozen hashes and the inherited ledger prefix, and makes **zero API requests**. It writes a verification report only. Use `python verify_strict.py` to re-execute every saved candidate from the strict supplement. `strict_state.py` without --live only loads durable cached acquisition records; it is not a substitute for this actual execution replay. Wall-clock timings are not expected to reproduce exactly; logical steps and outcomes are checked. Dataset generation and bounded execution use no external data.
 
 `python analyze.py` regenerates derived tables and figures from saved results. `python -m rm15.validation_study --output-root ../../work/v15-validation-replay` reproduces the primary mutant study in a separate output folder. Do not modify frozen input definitions or old experiment records in place.
+
+For a deep Windows checkout, prefix the script command with the included launcher,
+for example `python windows_long_paths.py verify_strict.py`. This enables long
+filesystem paths without changing experimental code. Run `analyze_strict.py`,
+`verify_release.py`, then `render_report.py` to regenerate the corrected state
+tables, final integrity ledger, and readable report. `verify_replay.py` records
+the budget at replay time, so a later rerun can have a different ledger snapshot
+from the archived pre-supplement verification while execution outcomes agree.
 
 Live acquisition is deliberately separate (`python -m rm15.campaign --live`). It reuses durable requests, never automatically retries an unknown dispatch, and requires the original authorized local credential configuration. It is unnecessary for checking the published evidence. A collaborator using their own key/data should create a new study version, ledger and declared budget rather than reset this experiment's ledger.
 
 ## Boundaries of the conclusions
 
-The 16 templates are related, not 864 independent tasks. There is one model draw per condition; intervals resample authored templates and do not establish population-wide confidence. Both oracle and solver are benchmark-team authored. The main source attack is a removable private-read gate with no `else`, and output goals can describe relatively simple mathematics. Specialist solvers can remain the best choice. Engineered validation mutants are not representative of natural model errors. The study neither estimates real Skill risk nor establishes novelty over all prior repair methods.
+The 16 templates are related, not 864 independent tasks. There is one recovery episode per condition, with up to two candidate slots and zero to two model requests as applicable; intervals resample authored templates and do not establish population-wide confidence. Both oracle and solver are benchmark-team authored. The main source attack is a removable private-read gate with no `else`, and output goals can describe relatively simple mathematics. Specialist solvers can remain the best choice. Engineered validation mutants are not representative of natural model errors. The study neither estimates real Skill risk nor establishes novelty over all prior repair methods.

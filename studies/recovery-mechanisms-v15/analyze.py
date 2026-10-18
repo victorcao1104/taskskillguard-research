@@ -18,7 +18,8 @@ def api_cost(a):
     if usage and all(type(usage.get(k)) is int for k in ('input_tokens','output_tokens')):
         ip,op=(.125,.5) if model=='gpt-6-luna' else (.4,1.6)
         return (usage['input_tokens']*ip+usage['output_tokens']*op)/1e6
-    req=next((ROOT/'api/requests').glob(a['_id']+'--slot'+str(a['slot'])+'.json'))
+    request_id=api.get('request_id',a['_id']+'--slot'+str(a['slot']))
+    req=ROOT/'api/requests'/(request_id+'.json')
     return json.loads(req.read_text())['reservation_upper_usd']
 
 
